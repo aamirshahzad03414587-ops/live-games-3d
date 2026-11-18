@@ -303,7 +303,7 @@ function giftToast(e) {
 function clockNow() { return RENDER ? vclock : performance.now() / 1000; }
 function feed(cls, html) {
   const el = document.createElement('div'); el.className = 'k ' + cls; el.innerHTML = html;
-  const f = $('feed'); f.prepend(el); while (f.children.length > 3) f.lastChild.remove();
+  const f = $('feed'); f.prepend(el); while (f.children.length > 2) f.lastChild.remove();
 }
 function toast(kind, title, sub) {
   const el = document.createElement('div'); el.className = 't ' + kind; el.innerHTML = `${title}<small>${sub}</small>`;

@@ -6,7 +6,7 @@ body.siege, .siege #stage { background: #0a0514; }
 .siege #howto .title.vote { background: linear-gradient(180deg, #a8f0ff, #3a8aff); color: #fff; border-color: #e0faff; box-shadow: 0 calc(var(--u) * 0.8) 0 #003a9a, 0 0 calc(var(--u) * 6) rgba(80,170,255,0.7); animation: votePulse 1s ease-in-out infinite; }
 .siege #howto .title.fight { background: linear-gradient(180deg, #ff8a8a, #e0204a); color: #fff; border-color: #ffd0d0; box-shadow: 0 calc(var(--u) * 0.8) 0 #7a0020; }
 .siege #howto .chips span { font-size: calc(var(--u) * 2.7); }
-#surv { position: absolute; top: 19.4%; left: 6%; right: 6%; text-align: center; pointer-events: none; }
+#surv { position: absolute; top: 21.4%; left: 6%; right: 6%; text-align: center; pointer-events: none; }
 #surv .sl { font-weight: 900; font-size: calc(var(--u) * 2.6); letter-spacing: 0.12em; color: #cfe8ff; text-shadow: 0 2px 0 #000, 0 0 6px #000; }
 #surv .sn { font-weight: 900; font-style: italic; font-size: calc(var(--u) * 8.6); line-height: 1.02; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: #fff;
   background: linear-gradient(180deg, #ffffff 15%, #bfe6ff 55%, #5ab0ff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
@@ -17,24 +17,24 @@ body.siege, .siege #stage { background: #0a0514; }
 #surv .sb { margin: calc(var(--u) * 0.6) auto 0; width: 70%; height: calc(var(--u) * 1); border-radius: 999px; background: rgba(0,0,0,0.55); overflow: hidden; }
 #surv .sb i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff2a4a, #ffd34d 40%, #5ab0ff); transition: width 0.3s; }
 #surv .drop { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); font-weight: 900; font-style: italic; font-size: calc(var(--u) * 4.4); color: #ff4a5a; -webkit-text-stroke: calc(var(--u) * 0.3) #2a0008; text-shadow: 0 0 calc(var(--u) * 3) rgba(255,40,60,0.9); animation: dropFloat 1.3s ease-out forwards; white-space: nowrap; }
-.siege #pill { top: 27.2%; background: linear-gradient(180deg, rgba(70,30,130,0.94), rgba(30,10,70,0.94)); border-color: rgba(200,160,255,0.7); box-shadow: 0 0 calc(var(--u) * 4) rgba(170,90,255,0.45); font-size: calc(var(--u) * 3.1); }
+.siege #pill { top: 29.2%; background: linear-gradient(180deg, rgba(70,30,130,0.94), rgba(30,10,70,0.94)); border-color: rgba(200,160,255,0.7); box-shadow: 0 0 calc(var(--u) * 4) rgba(170,90,255,0.45); font-size: calc(var(--u) * 3.1); }
 .siege #pill.boss { background: linear-gradient(180deg, rgba(200,30,70,0.95), rgba(100,0,40,0.95)); border-color: #ffb0c0; }
 .siege #pill.end { background: linear-gradient(180deg, rgba(255,190,40,0.95), rgba(220,120,0,0.95)); color: #3a1800; border-color: #fff3b0; }
-#barrier { position: absolute; top: 31.2%; left: 50%; transform: translateX(-50%); width: 58%; pointer-events: none; text-align: center; }
+#barrier { position: absolute; top: 33%; left: 50%; transform: translateX(-50%); width: 58%; pointer-events: none; text-align: center; }
 #barrier .bt { font-weight: 900; font-size: calc(var(--u) * 2.5); text-shadow: 0 2px 0 #000, 0 0 6px #000; white-space: nowrap; } #barrier .bt b { color: #8ad8ff; }
 #barrier .bar { margin-top: calc(var(--u) * 0.4); height: calc(var(--u) * 1.5); border-radius: 999px; background: rgba(0,0,0,0.55); border: calc(var(--u) * 0.3) solid rgba(140,210,255,0.6); overflow: hidden; }
 #barrier .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #3a6aff, #5ac8ff, #c8f4ff); box-shadow: 0 0 calc(var(--u) * 2) #5ac8ff; transition: width 0.3s; }
 #barrier.low .bar i { background: linear-gradient(90deg, #ff2a4a, #ff8a3a); }
 #barrier.low .bt b { color: #ff6a7a; animation: lowBlink 0.7s infinite; }
-#bossbar { position: absolute; top: 35.4%; left: 50%; transform: translateX(-50%); width: 76%; text-align: center; pointer-events: none; }
+#bossbar { position: absolute; top: 37%; left: 50%; transform: translateX(-50%); width: 76%; text-align: center; pointer-events: none; }
 #bossbar .bn { font-weight: 900; font-style: italic; font-size: calc(var(--u) * 3.4); color: #ffd0dc; text-shadow: 0 2px 0 #000, 0 0 calc(var(--u) * 3) #ff2a5a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #bossbar .bn b { color: #fff; font-size: calc(var(--u) * 2.8); }
 #bossbar .bar { margin-top: calc(var(--u) * 0.5); height: calc(var(--u) * 2.4); border-radius: 999px; background: rgba(0,0,0,0.6); border: calc(var(--u) * 0.35) solid #ffb0c0; overflow: hidden; transform: skewX(-12deg); }
 #bossbar .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff2a6a, #b03bff); transition: width 0.15s; }
-.siege #left, .siege #right { top: 35.6%; }
-.siege.bossing #left, .siege.bossing #right { top: 41%; }
+.siege #left, .siege #right { top: 37.6%; }
+.siege.bossing #left, .siege.bossing #right { top: 43%; }
 /* story vote */
-#vote { position: absolute; top: 35.2%; left: 5%; right: 5%; pointer-events: none; text-align: center; background: linear-gradient(180deg, rgba(20,8,50,0.92), rgba(50,14,90,0.9)); border: calc(var(--u) * 0.5) solid #9a7cff; border-radius: calc(var(--u) * 3); padding: calc(var(--u) * 1.6) calc(var(--u) * 2.2); box-shadow: 0 0 calc(var(--u) * 6) rgba(150,100,255,0.6); animation: popIn 0.4s cubic-bezier(.2,1.6,.4,1); z-index: 2; }
+#vote { position: absolute; top: 37%; left: 5%; right: 5%; pointer-events: none; text-align: center; background: linear-gradient(180deg, rgba(20,8,50,0.92), rgba(50,14,90,0.9)); border: calc(var(--u) * 0.5) solid #9a7cff; border-radius: calc(var(--u) * 3); padding: calc(var(--u) * 1.6) calc(var(--u) * 2.2); box-shadow: 0 0 calc(var(--u) * 6) rgba(150,100,255,0.6); animation: popIn 0.4s cubic-bezier(.2,1.6,.4,1); z-index: 2; }
 #vote .vq { font-weight: 900; font-style: italic; font-size: calc(var(--u) * 4.4); letter-spacing: 0.03em; color: #ffd36a; text-shadow: 0 2px 0 #000; margin-bottom: calc(var(--u) * 1); }
 #vote .vo { position: relative; display: flex; align-items: center; gap: calc(var(--u) * 1.6); margin: calc(var(--u) * 1) 0; padding: calc(var(--u) * 1.1) calc(var(--u) * 1.8); border-radius: calc(var(--u) * 2); background: rgba(0,0,0,0.45); border: calc(var(--u) * 0.35) solid rgba(255,255,255,0.25); overflow: hidden; font-weight: 900; font-size: calc(var(--u) * 3.6); text-align: left; transition: transform 0.2s, opacity 0.3s; }
 #vote .vo .k { display: inline-grid; place-items: center; min-width: calc(var(--u) * 6); height: calc(var(--u) * 6); border-radius: 50%; background: #ffd36a; color: #2a0f00; font-size: calc(var(--u) * 4); z-index: 1; }

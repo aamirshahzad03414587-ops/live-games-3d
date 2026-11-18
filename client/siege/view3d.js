@@ -154,7 +154,7 @@ export function createSiegeView(canvas, opts = {}) {
     wall.add(t); towers.push({ t, flag });
   }
   // the keep behind the wall (the citadel the survivors hide in)
-  const keepG = new Group(); keepG.position.set(0, 0, 13);
+  const keepG = new Group(); keepG.position.set(0, 0, 30);
   { const b = new Mesh(G.box, stoneM); b.scale.set(9, 7, 5); b.position.y = 3.5; keepG.add(b); const r = new Mesh(G.cone, toon(0x5a2a6a)); r.scale.set(5, 4, 5); r.rotation.y = Math.PI / 4; r.position.y = 9; keepG.add(r);
     for (const sx of [-1, 1]) { const tw = new Mesh(G.cyl, stoneM); tw.scale.set(1.4, 10, 1.4); tw.position.set(sx * 4.6, 5, 0); keepG.add(tw); const tr = new Mesh(G.cone, toon(0x5a2a6a)); tr.scale.set(1.8, 3, 1.8); tr.position.set(sx * 4.6, 11.5, 0); keepG.add(tr); } }
   scene.add(keepG);
@@ -196,10 +196,11 @@ export function createSiegeView(canvas, opts = {}) {
     fragmentShader: `varying vec3 vN; varying vec3 vV; varying vec3 vP; uniform float time; uniform float a; uniform float hit; uniform vec3 col;
       void main(){ float f = 1.0 - abs(dot(vN, vV)); vec2 g = abs(fract(vec2(atan(vP.x, vP.z) * 5.0, vP.y * 6.0)) - 0.5);
         float hex = smoothstep(0.42, 0.5, max(g.x, g.y)); float band = 0.5 + 0.5 * sin(vP.y * 18.0 - time * 3.0);
-        float k = pow(f, 1.6) * 0.9 + hex * 0.22 + band * 0.05; gl_FragColor = vec4(mix(col, vec3(1.0), hit * 0.6) * k * a, 1.0); }`,
+        float k = pow(f, 2.4) * 0.6 + hex * 0.2 + band * 0.05; gl_FragColor = vec4(mix(col, vec3(1.0), hit * 0.6) * k * a, 1.0); }`,
   }));
-  const barrier = new Mesh(keep(new SphereGeometry(1, 28, 14, Math.PI / 2, Math.PI, 0, Math.PI / 2)), barrierMat);
-  barrier.scale.set(12.6, 7, 4.5); barrier.position.set(0, 0, WALL_FRONT + 1.6); barrier.renderOrder = 8; scene.add(barrier);
+  // a curved shield wall standing just in front of the battlements (open cylinder arc facing the rift)
+  const barrier = new Mesh(keep(new CylinderGeometry(1, 1, 1, 36, 1, true, Math.PI - 0.95, 1.9).translate(0, 0.5, 0)), barrierMat);
+  barrier.scale.set(14, 7, 14); barrier.position.set(0, 0, WALL_FRONT + 13.2); barrier.renderOrder = 8; scene.add(barrier);
 
   // ------------------------------------------------------------------ defenders (instanced chibis + class props)
   const CAP = opts.maxChars || 70;
@@ -421,7 +422,7 @@ export function createSiegeView(canvas, opts = {}) {
     // ---------------- barrier dome
     const bar = Math.max(0, Math.min(100, w.bar || 0)) / 100;
     barrier.visible = bar > 0.02 || now - barrierHit < 0.4;
-    barrierMat.uniforms.time.value = now; barrierMat.uniforms.a.value = 0.2 + bar * 0.8 + (now - barrierHit < 0.3 ? 0.6 : 0);
+    barrierMat.uniforms.time.value = now; barrierMat.uniforms.a.value = 0.12 + bar * 0.4 + (now - barrierHit < 0.3 ? 0.5 : 0);
     barrierMat.uniforms.hit.value = Math.max(0, 1 - (now - barrierHit) / 0.3);
     barrierMat.uniforms.col.value.setHex(bar > 0.66 ? 0x7ad8ff : bar > 0.33 ? 0x5ab0ff : 0x7a70ff);
     barrier.scale.y = 6 + bar * 1.5;
@@ -434,14 +435,14 @@ export function createSiegeView(canvas, opts = {}) {
       const e = k * k * (3 - 2 * k);
       tgtPos.set(Math.sin(e * 1.4 - 0.7) * 10, 6 + e * 6, -6 + e * 24); tgtLook.set(0, RIFT_Y - e * 5, RIFT_Z + e * 22);
     } else if (w.phase === 'gather' || w.phase === 'chapter') {
-      tgtPos.set(Math.sin(now * 0.12) * 2.5, 12.5, 19); tgtLook.set(0, 1.6, -8);
+      tgtPos.set(Math.sin(now * 0.12) * 2.5, 12.5, 18.5); tgtLook.set(0, 0.8, -3);
     } else if (w.phase === 'boss' && w.bo) {
-      tgtPos.set(Math.sin(now * 0.2) * 1.5, 14, 20.5); tgtLook.set(bossVis.x * 0.3, 2.2, Math.max(-14, bossVis.z * 0.45 - 5));
+      tgtPos.set(Math.sin(now * 0.2) * 1.5, 14.5, 20); tgtLook.set(bossVis.x * 0.3, 0.8, Math.max(-10, bossVis.z * 0.35 - 3));
     } else if (w.phase === 'vote' || w.phase === 'choice') {
-      tgtPos.set(Math.sin(now * 0.25) * 3, 8.5, 15); tgtLook.set(0, 5, -16);
+      tgtPos.set(Math.sin(now * 0.25) * 3, 11, 17); tgtLook.set(0, 3.5, -14);
     } else if (w.phase === 'ending') {
       const a = now * 0.12; tgtPos.set(Math.sin(a) * 14, 9 + dawn * 3, 10 + Math.cos(a) * 8); tgtLook.set(0, 3 + dawn * 2, -6);
-    } else { tgtPos.set(Math.sin(now * 0.15) * 1.2, 13.5, 20); tgtLook.set(0, 1.4, -9.5); }
+    } else { tgtPos.set(Math.sin(now * 0.15) * 1.2, 14, 19.5); tgtLook.set(0, 0.3, -4); }
     const ck = Math.min(1, dt * (w.phase === 'intro' ? 1.6 : 1.8));
     if (camPos.distanceTo(tgtPos) > 45) { camPos.copy(tgtPos); camLook.copy(tgtLook); }
     camPos.lerp(tgtPos, ck); camLook.lerp(tgtLook, ck);
@@ -645,7 +646,7 @@ export function createSiegeView(canvas, opts = {}) {
       Q.setFromUnitVectors(up, tmpV.copy(b.b).sub(b.a).normalize());
       const wv = b.w * (kk < 0.2 ? kk / 0.2 : 1 - (kk - 0.2) / 0.8);
       beamMesh.setMatrixAt(i, M4.compose(V, Q, S.set(wv, len, wv)));
-      beamMesh.setColorAt(i, C.setHex(b.col).multiplyScalar(1.2 * (1 - kk * 0.6)));
+      beamMesh.setColorAt(i, C.setHex(b.col).multiplyScalar(0.8 * (1 - kk) * (1 - kk * 0.3)));
     }
     beamMesh.count = beams.length; beamMesh.instanceMatrix.needsUpdate = true; if (beamMesh.instanceColor) beamMesh.instanceColor.needsUpdate = true;
 
