@@ -67,8 +67,21 @@ export function createAudio({ silenceUrl = '/assets/silence.mp3', record = false
     fanfare: (c, o, t) => { [[523, 0], [659, 0.12], [784, 0.24], [1047, 0.38], [784, 0.6], [1047, 0.72]].forEach(([f, dt], i) => { tone(c, o, t + dt, { type: 'sawtooth', f0: f, d: i === 5 ? 0.9 : 0.16, peak: 0.07 }); tone(c, o, t + dt, { type: 'triangle', f0: f * 2, d: i === 5 ? 0.9 : 0.16, peak: 0.05 }); }); SFX.cheer(c, o, t + 0.2); },
     nuke: (c, o, t) => { SFX.boom(c, o, t, 1.3); SFX.boom(c, o, t + 0.25, 1); tone(c, o, t, { type: 'sawtooth', f0: 220, f1: 40, d: 1.6, peak: 0.25 }); },
     pop: (c, o, t) => { tone(c, o, t, { f0: 500, f1: 1400, d: 0.07, peak: 0.15 }); },
+    // ---- Haunted Tower (spooky but fun)
+    creak: (c, o, t) => { tone(c, o, t, { type: 'sawtooth', f0: 95, f1: 140, a: 0.08, d: 0.7, peak: 0.07, det: 8 }); tone(c, o, t + 0.05, { type: 'square', f0: 190, f1: 120, a: 0.1, d: 0.6, peak: 0.03 }); noise(c, o, t, { type: 'bandpass', f0: 900, f1: 500, q: 6, a: 0.1, d: 0.6, peak: 0.12 }); },
+    ghost: (c, o, t) => { tone(c, o, t, { type: 'sine', f0: 520, f1: 760, a: 0.25, d: 0.9, peak: 0.08, det: 15 }); tone(c, o, t + 0.1, { type: 'sine', f0: 780, f1: 500, a: 0.3, d: 0.9, peak: 0.05 }); },
+    thunder: (c, o, t) => { noise(c, o, t, { f0: 500, f1: 60, a: 0.02, d: 1.8, peak: 0.6 }); noise(c, o, t + 0.15, { f0: 250, f1: 50, a: 0.1, d: 1.6, peak: 0.45 }); },
+    bell: (c, o, t) => { [[110, 0.25], [220, 0.12], [277, 0.07], [330, 0.06], [440, 0.04]].forEach(([f, p]) => tone(c, o, t, { type: 'sine', f0: f, a: 0.004, d: 2.6, peak: p })); },
+    organ: (c, o, t) => { [[147, 0], [175, 0], [220, 0], [294, 0.02], [131, 0.6], [165, 0.6], [196, 0.6], [262, 0.62]].forEach(([f, dt]) => { tone(c, o, t + dt, { type: 'sawtooth', f0: f, a: 0.04, d: dt ? 0.9 : 0.55, peak: 0.035 }); tone(c, o, t + dt, { type: 'triangle', f0: f * 2, a: 0.04, d: dt ? 0.9 : 0.55, peak: 0.03 }); }); },
+    heart: (c, o, t) => { tone(c, o, t, { f0: 70, f1: 45, d: 0.12, peak: 0.45 }); tone(c, o, t + 0.17, { f0: 62, f1: 40, d: 0.14, peak: 0.35 }); },
+    chime: (c, o, t) => { [1319, 1568, 1976, 2637].forEach((f, i) => tone(c, o, t + i * 0.07, { type: 'sine', f0: f, d: 0.6, peak: 0.07 })); },
+    trap: (c, o, t) => { noise(c, o, t, { type: 'bandpass', f0: 3000, f1: 300, q: 1.5, a: 0.01, d: 0.35, peak: 0.4 }); SFX.boom(c, o, t + 0.22, 0.7); },
+    shatter: (c, o, t) => { for (let i = 0; i < 6; i++) tone(c, o, t + i * 0.035, { type: 'triangle', f0: 2200 + i * 430, f1: 1800, d: 0.12, peak: 0.06 }); noise(c, o, t, { type: 'highpass', f0: 4000, d: 0.4, peak: 0.3 }); },
+    wind: (c, o, t) => { noise(c, o, t, { type: 'bandpass', f0: 380, f1: 700, q: 4, a: 0.9, d: 2.2, peak: 0.12 }); },
+    squeak: (c, o, t) => { tone(c, o, t, { type: 'triangle', f0: 900, f1: 1300, d: 0.08, peak: 0.07 }); },
+    roar: (c, o, t) => { tone(c, o, t, { type: 'sawtooth', f0: 120, f1: 60, a: 0.05, d: 0.9, peak: 0.16, det: 20 }); noise(c, o, t, { type: 'lowpass', f0: 1200, f1: 300, a: 0.05, d: 0.9, peak: 0.35 }); },
   };
-  const GAP = { punch: 0.045, crit: 0.06, block: 0.08, ko: 0.08, heal: 0.15, land: 0.06, pop: 0.05, coin: 0.05, boom: 0.06 };
+  const GAP = { squeak: 0.06, ghost: 0.25, heart: 0.3, punch: 0.045, crit: 0.06, block: 0.08, ko: 0.08, heal: 0.15, land: 0.06, pop: 0.05, coin: 0.05, boom: 0.06 };
   A.sfx = (kind, t = A.now(), v = 1) => {
     if (A.muted || !SFX[kind]) return;
     const g = GAP[kind] || 0.03; if (A.last[kind] && t - A.last[kind] < g) return; A.last[kind] = t;

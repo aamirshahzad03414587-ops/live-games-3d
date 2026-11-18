@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Haunted Tower">
+<meta name="theme-color" content="#120a20">
+<title>Mira's Haunted Tower · LIVE</title>
+<link rel="stylesheet" href="/br/br.css">
+<link rel="stylesheet" href="/tower/tower.css">
+</head>
+<body class="tower">
+<div id="stage">
+  <canvas id="gl"></canvas>
+  <div id="vignette"></div>
+  <canvas id="hud"></canvas>
+  <div id="flash"></div>
+
+  <div id="howto">
+    <div class="title" id="howTitle">🏮 COMMENT TO JOIN THE CLIMB!</div>
+    <div class="chips" id="howChips"><span>🚪 comment 1 · 2 · 3</span><span>❤️ likes = lantern oil</span><span>❓ answer riddles</span></div>
+  </div>
+  <div id="pill"><span id="pillTxt">Connecting…</span></div>
+  <div id="fuel"><div class="ft">🏮 LANTERN OIL <b id="fuelN">100%</b><span id="shields"></span></div><div class="bar"><i id="fuelBar"></i></div></div>
+
+  <div id="bossbar" hidden><div class="bn" id="bossName"></div><div class="bar"><i id="bossHp"></i></div><div class="bt">💬 SPAM CHAT TO HIT · ❤️ LIKES HURT IT</div></div>
+  <div id="riddle" hidden><div class="rq" id="riddleQ"></div><div class="ra" id="riddleA">✍️ First to comment the answer wins!</div></div>
+
+  <div id="left">
+    <div id="board" hidden><div class="bh" id="boardTitle">🏰 TOP CLIMBERS</div><ol id="boardList"></ol></div>
+    <div id="feed"></div>
+    <div id="toasts"></div>
+  </div>
+
+  <div id="right">
+    <div class="gh">🎁 GIFT POWERS</div>
+    <div id="gifts"></div>
+    <div class="perk">➕ Follow = spare life</div>
+    <div class="perk">🔁 Share = life + oil</div>
+    <div id="likes"><div class="lt">❤️ <b id="likeN">0</b>/300 blaze</div><div class="bar"><i id="likeBar"></i></div></div>
+  </div>
+
+  <div id="count" hidden></div>
+  <div id="banner" hidden></div>
+  <div id="winner" hidden><div class="w1" id="winTitle">🏰 FLOOR 1</div><div class="w2" id="winName"></div><div class="w3" id="winSub"></div></div>
+  <div id="say" hidden></div>
+  <button id="soundChip" hidden>🔊 Tap for sound</button>
+  <div id="notice" hidden></div>
+  <div id="conn" title="LIVE connection"></div>
+</div>
+<script src="/tower/app.js"></script>
+</body>
+</html>

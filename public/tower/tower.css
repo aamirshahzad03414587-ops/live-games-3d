@@ -1,0 +1,42 @@
+/* Haunted Tower overrides on top of the shared overlay styles (br.css). Same 9:16 safe areas: the important HUD sits
+   between ~11% and ~64% of the height (TikTok's top bar, comments and buttons cover the rest). */
+body.tower, .tower #stage { background: #0c0614; }
+.tower #howto .title { background: linear-gradient(180deg, #ffe08a, #ff9a3c); border-color: #fff0c8; color: #2a0f00; box-shadow: 0 calc(var(--u) * 0.8) 0 #9a3a00, 0 0 calc(var(--u) * 6) rgba(255,150,60,0.55); }
+.tower #howto .title.vote { background: linear-gradient(180deg, #d8b4ff, #8a4dff); color: #fff; border-color: #f0e0ff; box-shadow: 0 calc(var(--u) * 0.8) 0 #4a1a9a, 0 0 calc(var(--u) * 6) rgba(170,110,255,0.7); text-shadow: 0 2px 0 rgba(0,0,0,0.35); animation: votePulse 1s ease-in-out infinite; }
+.tower #howto .title.fight { background: linear-gradient(180deg, #ff8a8a, #e0204a); color: #fff; border-color: #ffd0d0; box-shadow: 0 calc(var(--u) * 0.8) 0 #7a0020; animation: votePulse 0.6s ease-in-out infinite; }
+.tower #howto .title.riddle { background: linear-gradient(180deg, #a8f0ff, #3aa8ff); color: #002a4a; border-color: #e0faff; box-shadow: 0 calc(var(--u) * 0.8) 0 #005a9a; }
+.tower #pill { background: linear-gradient(180deg, rgba(90,40,140,0.94), rgba(40,14,80,0.94)); border-color: rgba(255,200,140,0.7); box-shadow: 0 0 calc(var(--u) * 4) rgba(255,150,80,0.45); }
+.tower #pill.boss { background: linear-gradient(180deg, rgba(150,40,200,0.95), rgba(70,10,110,0.95)); border-color: #e0b0ff; }
+.tower #pill.end { background: linear-gradient(180deg, rgba(255,190,40,0.95), rgba(220,120,0,0.95)); color: #3a1800; border-color: #fff3b0; }
+#fuel { position: absolute; top: 25.6%; left: 50%; transform: translateX(-50%); width: 56%; pointer-events: none; text-align: center; }
+#fuel .ft { font-weight: 900; font-size: calc(var(--u) * 2.7); text-shadow: 0 2px 0 #000, 0 0 6px #000; white-space: nowrap; }
+#fuel .ft b { color: #ffd36a; } #fuel .ft span { margin-left: calc(var(--u) * 1.2); }
+#fuel .bar { margin-top: calc(var(--u) * 0.5); height: calc(var(--u) * 1.8); border-radius: 999px; background: rgba(0,0,0,0.55); border: calc(var(--u) * 0.3) solid rgba(255,210,140,0.55); overflow: hidden; }
+#fuel .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff7a1a, #ffd34d, #fff2a8); box-shadow: 0 0 calc(var(--u) * 2) #ffb020; transition: width 0.35s; }
+#fuel.low .bar i { background: linear-gradient(90deg, #ff2a2a, #ff7a1a); animation: lowBlink 0.7s infinite; }
+#fuel.low .ft b { color: #ff6a6a; }
+#bossbar { position: absolute; top: 30.6%; left: 50%; transform: translateX(-50%); width: 64%; text-align: center; pointer-events: none; }
+#bossbar .bn { font-weight: 900; font-size: calc(var(--u) * 3.4); color: #e8d0ff; text-shadow: 0 2px 0 #000, 0 0 calc(var(--u) * 3) #a050ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#bossbar .bar { margin-top: calc(var(--u) * 0.6); height: calc(var(--u) * 2.6); border-radius: 999px; background: rgba(0,0,0,0.6); border: calc(var(--u) * 0.35) solid #e0b0ff; overflow: hidden; }
+#bossbar .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff2a6a, #b03bff); transition: width 0.15s; }
+#bossbar .bt { margin-top: calc(var(--u) * 0.6); font-weight: 900; font-size: calc(var(--u) * 2.5); text-shadow: 0 2px 0 #000; }
+#riddle { position: absolute; top: 30.4%; left: 5%; right: 5%; text-align: center; pointer-events: none; background: linear-gradient(180deg, rgba(30,10,70,0.9), rgba(60,20,110,0.88)); border: calc(var(--u) * 0.5) solid #b07cff; border-radius: calc(var(--u) * 3); padding: calc(var(--u) * 1.8) calc(var(--u) * 2.4); box-shadow: 0 0 calc(var(--u) * 6) rgba(170,110,255,0.6); animation: popIn 0.4s cubic-bezier(.2,1.6,.4,1); z-index: 2; }
+#riddle .rq { font-weight: 900; font-size: calc(var(--u) * 4.1); line-height: 1.2; }
+#riddle .ra { margin-top: calc(var(--u) * 1); font-weight: 800; font-size: calc(var(--u) * 2.9); color: #ffd36a; }
+#riddle.solved { border-color: #ffd34d; box-shadow: 0 0 calc(var(--u) * 8) rgba(255,210,80,0.8); }
+.tower #left, .tower #right { top: 31%; }
+.tower.fighting #left, .tower.fighting #right, .tower.riddling #left, .tower.riddling #right { top: 41%; }
+#say.mira { top: 58.5%; display: flex; align-items: flex-start; gap: calc(var(--u) * 1.6); text-align: left; left: 4%; right: 4%; }
+#say.mira img { width: calc(var(--u) * 11); height: calc(var(--u) * 11); border-radius: 50%; border: calc(var(--u) * 0.6) solid #c79bff; box-shadow: 0 0 calc(var(--u) * 3) #a050ff; flex: none; animation: talkBob 0.35s ease-in-out infinite alternate; }
+#say.mira .txt { background: rgba(26,8,52,0.82); border: calc(var(--u) * 0.35) solid rgba(200,150,255,0.6); border-radius: calc(var(--u) * 2.4); padding: calc(var(--u) * 1) calc(var(--u) * 2); font-size: calc(var(--u) * 3.3); line-height: 1.25; }
+#say.mira .who { display: block; font-size: calc(var(--u) * 2.4); color: #d7b4ff; font-weight: 900; letter-spacing: 0.04em; }
+.tower #winner .w1 { color: #ffd34d; }
+.tower #banner { background: linear-gradient(180deg, #fff 10%, #e2c8ff 50%, #a050ff); -webkit-background-clip: text; background-clip: text; -webkit-text-stroke: calc(var(--u) * 0.45) #1a0430; filter: drop-shadow(0 calc(var(--u) * 0.8) 0 rgba(26,4,48,0.9)) drop-shadow(0 0 calc(var(--u) * 4) rgba(170,90,255,0.8)); }
+.tower #toasts .t.prophecy { background: linear-gradient(90deg, #7a3cff, #c05cff); } .tower #toasts .t.shield { background: linear-gradient(90deg, #1fb6ff, #3a6aff); } .tower #toasts .t.rescue { background: linear-gradient(90deg, #ff5fa8, #ff2d6f); } .tower #toasts .t.skip { background: linear-gradient(90deg, #ffb020, #ff6a00); } .tower #toasts .t.boss { background: linear-gradient(90deg, #b03bff, #ff3bd5); }
+.tower #feed .k.fall { border-left-color: #a07cff; } .tower #feed .k.rise { border-left-color: #ffe14a; } .tower #feed .k.win { border-left-color: #2ee67a; }
+.tower #count { color: #ffe9b0; text-shadow: 0 calc(var(--u)) 0 #7a2a00, 0 0 calc(var(--u) * 8) rgba(255,150,60,0.8); top: 40%; }
+.tower #vignette { transition: background 1s; }
+.tower.dark #vignette { background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 35%, rgba(5,0,12,0.85) 100%); }
+@keyframes votePulse { 50% { transform: scale(1.05); } }
+@keyframes lowBlink { 50% { opacity: 0.45; } }
+@keyframes talkBob { to { transform: translateY(calc(var(--u) * -0.5)) rotate(-2deg); } }

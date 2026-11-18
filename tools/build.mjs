@@ -1,3 +1,4 @@
-// Bundles the overlay (three.js tree-shaken + our modules) into public/br/app.js. Run: node tools/build.mjs
+// Bundles the overlays (three.js tree-shaken + our modules) into public/<game>/app.js. Run: node tools/build.mjs
 import { build } from 'esbuild';
-await build({ entryPoints: ['client/br/main.js'], bundle: true, minify: true, format: 'iife', target: ['safari15', 'chrome100'], outfile: 'public/br/app.js', legalComments: 'none', sourcemap: false, logLevel: 'info' });
+const opts = { bundle: true, minify: true, format: 'iife', target: ['safari15', 'chrome100'], legalComments: 'none', sourcemap: false, logLevel: 'info' };
+for (const g of ['br', 'tower']) await build({ ...opts, entryPoints: [`client/${g}/main.js`], outfile: `public/${g}/app.js` });

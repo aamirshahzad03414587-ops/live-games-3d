@@ -1,8 +1,8 @@
 // Server side of the announcer: lines from br-lines.js -> free TTS (Edge, Google fallback) -> broadcast to overlays.
 // One line at a time; at most 3 waiting; stale low-priority lines are dropped so the voice keeps up with the action.
 export class Announcer {
-  constructor({ tts, broadcast, listeners = () => 1, now = () => Date.now() }) {
-    this.tts = tts; this.broadcast = broadcast; this.listeners = listeners; this.now = now;
+  constructor({ tts, broadcast, listeners = () => 1, now = () => Date.now(), voice = null }) {
+    this.tts = tts; this.voice = voice; this.broadcast = broadcast; this.listeners = listeners; this.now = now;
     this.pending = []; this.busyUntil = 0; this.timer = null; this.stats = { said: 0, dropped: 0, noVoice: 0 };
   }
   push(line) {
@@ -17,7 +17,7 @@ export class Announcer {
   }
   // voice is made lazily (only for the line about to play, plus one prefetch) so dropped lines never hit the TTS service
   audioFor(item) {
-    if (!item.audio) item.audio = this.listeners() > 0 && this.tts ? this.tts.synth(item.text).catch(() => null) : Promise.resolve(null);
+    if (!item.audio) item.audio = this.listeners() > 0 && this.tts ? this.tts.synth(item.text, (typeof this.voice === 'function' ? this.voice() : this.voice) || {}).catch(() => null) : Promise.resolve(null);
     return item.audio;
   }
   clear() { this.pending = []; }

@@ -2,7 +2,7 @@
 // shares. mode: quiet (3 viewers), busy (ramps to ~220 viewers), gifts (a gift storm), demo (a scripted 60 s show).
 const FIRST = ['Sara', 'Ali', 'Hina', 'Omar', 'Zara', 'Bilal', 'Noor', 'Ayan', 'Esha', 'Faraz', 'Iman', 'Junaid', 'Kinza', 'Laiba', 'Moiz', 'Nimra', 'Rida', 'Saad', 'Tania', 'Umer', 'Maya', 'Leo', 'Aisha', 'Yusuf', 'Lina', 'Kai', 'Mia', 'Zain', 'Sofia', 'Adam', 'Hamza', 'Amna', 'Riya', 'Dev', 'Luna', 'Max'];
 const TAIL = ['', '_x', '22', '.official', '_99', '🌸', 'xo', '_07', '.live', '✨', '_pk', '786'];
-const CHAT = ['hi', 'join', 'lets go', 'me!', 'hello from dubai', 'gg', 'this is fire', 'shield', 'dash', '💨', '🛡️', 'dance', 'color pink', 'color gold', 'revenge', 'wow', '🔥🔥', 'i will win', 'play'];
+const CHAT = ['hi', 'join', 'lets go', 'me!', 'hello from dubai', 'gg', 'this is fire', 'shield', 'dash', '💨', '🛡️', 'dance', 'color pink', 'color gold', 'revenge', 'wow', '🔥🔥', 'i will win', 'play', '1', '2', '3', '2', 'left', 'right', '3️⃣', 'candle', 'clock', 'echo', 'map', 'attack'];
 export const GIFTS = [['Rose', 1], ['TikTok', 1], ['Finger Heart', 5], ['GG', 1], ['Doughnut', 30], ['Hand Hearts', 100], ['Corgi', 299], ['Money Gun', 500], ['Lion', 29999]];
 
 export function crowd(mode = 'busy', rng = Math.random) {

@@ -11,6 +11,8 @@ import { TTS } from './tts.js';
 import { diagRoute } from './diag.js';
 import { Board } from './board.js';
 import { BRGame } from './games/br.js';
+import { TowerGame } from './games/tower.js';
+import { TowerBoard } from './tower-board.js';
 import { crowd } from '../public/shared/crowd.js';
 
 const config = loadConfig();
@@ -21,8 +23,9 @@ const listeners = (game) => () => { let n = 0; for (const c of clients) if (c.ga
 const broadcastTo = (game) => (msg) => { const s = JSON.stringify(msg); for (const c of clients) if (c.game === game && c.ws.readyState === 1 && c.ws.bufferedAmount < 2e6) c.ws.send(s); };
 const games = {
   br: new BRGame({ config, tts, board: new Board(path.join(DATA_DIR, 'br-board.json'), SECRET), broadcast: broadcastTo('br'), listeners: listeners('br') }),
+  tower: new TowerGame({ config, tts, board: new TowerBoard(path.join(DATA_DIR, 'tower-board.json'), SECRET), broadcast: broadcastTo('tower'), listeners: listeners('tower') }),
 };
-games.br.start();
+for (const g of Object.values(games)) g.start();
 
 // LIVE events -> every game (one LIVE feeds whichever game is on screen)
 const recentFeed = [];
@@ -56,8 +59,9 @@ const pub = path.join(ROOT, 'public');
 const page = (f) => (req, res) => res.sendFile(path.join(pub, f));
 app.get('/', page('index.html'));
 app.get(['/br', '/br/'], page('br/index.html'));
+app.get(['/tower', '/tower/'], page('tower/index.html'));
 app.get('/admin', requireKey, page('admin.html'));
-app.get(['/healthz', '/health'], (req, res) => res.json({ ok: true, tiktok: tiktok.status.state, overlays: clients.size, br: games.br.summary().phase, voice: tts.stats }));
+app.get(['/healthz', '/health'], (req, res) => res.json({ ok: true, tiktok: tiktok.status.state, overlays: clients.size, br: games.br.summary().phase, tower: games.tower.summary().phase, voice: tts.stats }));
 app.post('/diag', express.text({ type: '*/*', limit: '8kb' }), diagRoute());
 app.get('/tts/:id.mp3', (req, res) => {
   const buf = tts.get(req.params.id);
@@ -71,10 +75,12 @@ app.get('/api/say', async (req, res) => {
   const ip = String(req.ip), now = Date.now(), h = ttsHits.get(ip) || { t: now, n: 0 };
   if (now - h.t > 60e3) { h.t = now; h.n = 0; } h.n++; ttsHits.set(ip, h); if (ttsHits.size > 5000) ttsHits.clear();
   if (!text || (h.n > 40 && !keyOk(req))) return res.status(429).json({ error: 'slow down' });
-  const a = await tts.synth(text).catch(() => null);
+  const o = req.query.voice === 'mira' ? { voice: config.tower.voice, rate: config.tower.rate, pitch: config.tower.pitch } : {};
+  const a = await tts.synth(text, o).catch(() => null);
   res.json(a ? { url: a.url, dur: a.duration } : { url: null });
 });
 app.get('/api/br/board', (req, res) => { const m = games.br.boardMsg(); delete m.signed; res.json(m); });
+app.get('/api/tower/board', (req, res) => { const m = games.tower.boardMsg(); delete m.signed; res.json(m); });
 app.use('/vendor/three', express.static(path.join(ROOT, 'node_modules', 'three', 'build'), { maxAge: '7d', immutable: true }));
 app.use(express.static(pub, { index: false, maxAge: '5m' }));
 
@@ -83,8 +89,8 @@ const admin = express.Router();
 admin.use(requireKey);
 let crowdRun = null;
 admin.get('/status', (req, res) => res.json({
-  tiktok: tiktok.status, br: games.br.summary(), overlays: [...clients].map((c) => ({ game: c.game, ios: c.ios, admin: c.admin, since: c.since })),
-  settings: { br: config.br, voice: { enabled: config.voice.enabled, voice: config.voice.voice, rate: config.voice.rate }, tiktok: { username: config.tiktok.username, liveSource: tiktok.source } },
+  tiktok: tiktok.status, br: games.br.summary(), tower: games.tower.summary(), overlays: [...clients].map((c) => ({ game: c.game, ios: c.ios, admin: c.admin, since: c.since })),
+  settings: { br: config.br, tower: config.tower, voice: { enabled: config.voice.enabled, voice: config.voice.voice, rate: config.voice.rate }, tiktok: { username: config.tiktok.username, liveSource: tiktok.source } },
   tts: { ...tts.stats, lastError: tts.lastError, check: tts.check || null }, crowd: crowdRun ? { mode: crowdRun.mode, left: Math.round((crowdRun.until - Date.now()) / 1000) } : null, feed: recentFeed.slice(-12), publicUrl: config.publicUrl,
 }));
 admin.post('/sim/:type', (req, res) => {
@@ -107,6 +113,7 @@ admin.post('/crowd', (req, res) => {
 admin.post('/settings', (req, res) => {
   const b = req.body || {};
   if (b.br) { for (const k of ['lobbySeconds', 'arenaCap', 'minFighters']) if (b.br[k] !== undefined) config.br[k] = Math.max(0, Math.min(k === 'arenaCap' ? 120 : 120, Number(b.br[k]) || 0)); if (b.br.bots !== undefined) config.br.bots = !!b.br.bots; games.br.applySettings(config.br); }
+  if (b.tower) { for (const k of ['gatherSeconds', 'voteSeconds', 'minParty', 'riddleSeconds', 'bossSeconds']) if (b.tower[k] !== undefined) config.tower[k] = Math.max(0, Math.min(120, Number(b.tower[k]) || 0)); if (b.tower.bots !== undefined) config.tower.bots = !!b.tower.bots; games.tower.applySettings(config.tower); }
   if (b.voice) { if (b.voice.enabled !== undefined) config.voice.enabled = !!b.voice.enabled; if (typeof b.voice.voice === 'string' && /^[a-z]{2}-[A-Z]{2}-\w+Neural$/.test(b.voice.voice)) config.voice.voice = b.voice.voice; }
   if (b.tiktok) { if (typeof b.tiktok.username === 'string') config.tiktok.username = b.tiktok.username.replace(/^@/, '').trim().slice(0, 40); if (['direct', 'tikfinity', 'both'].includes(b.tiktok.liveSource)) config.tiktok.liveSource = b.tiktok.liveSource; configureTikTok(); }
   saveConfig(config);
@@ -117,6 +124,8 @@ admin.post('/tiktok/disconnect', async (req, res) => { await tiktok.disconnect()
 admin.post('/new-stream', (req, res) => { hub.newStream(); res.json({ ok: true }); });
 admin.post('/br/reset-board', (req, res) => { games.br.board.reset(); games.br.broadcast(games.br.boardMsg()); res.json({ ok: true }); });
 admin.post('/br/skip', (req, res) => { const s = games.br.sim; s.phaseEnd = s.t; if (s.phase === 'battle') for (const f of s.aliveList().slice(1)) s.ko(f, null, { storm: true }); res.json({ ok: true }); });
+admin.post('/tower/reset-board', (req, res) => { games.tower.board.reset(); games.tower.broadcast(games.tower.boardMsg()); res.json({ ok: true }); });
+admin.post('/tower/skip', (req, res) => { const s = games.tower.sim; s.phaseEnd = s.t; if (s.monster) s.monster.hp = 0.01; res.json({ ok: true, phase: s.phase }); });
 admin.post('/voice-check', async (req, res) => res.json(await tts.selfTest().catch((e) => ({ error: e.message }))));
 app.use('/api/admin', admin);
 
@@ -136,7 +145,7 @@ wss.on('connection', (ws, req) => {
     let m; try { m = JSON.parse(raw); } catch { return; }
     if (m.t === 'tf' && c.admin && m.ev) tiktok.ingest(m.ev, 'tikfinity');
     else if (m.t === 'tf-status' && c.admin) tiktok.setStatus(m.state, m.message, { username: m.username });
-    else if (m.t === 'restore' && game === 'br' && games.br.board.restore(m.json, m.sig)) { console.log('[br] all-time board restored from the overlay copy'); games.br.broadcast(games.br.boardMsg()); }
+    else if (m.t === 'restore' && games[game].board.restore(m.json, m.sig)) { console.log(`[${game}] all-time board restored from the overlay copy`); games[game].broadcast(games[game].boardMsg()); }
   });
   ws.on('close', () => clients.delete(c));
 });
@@ -147,6 +156,7 @@ server.listen(PORT, () => {
   const base = config.publicUrl || `http://localhost:${PORT}`;
   console.log(`Live Games 3D on ${base}`);
   console.log(`  Battle Royale overlay (open on the iPhone): ${base}/br`);
+  console.log(`  Haunted Tower overlay: ${base}/tower`);
   console.log(`  Admin: ${base}/admin?key=…  (ADMIN_KEY ${config.adminKey ? 'set' : 'not set: admin only from this computer'})`);
   if (tiktok.usesDirect && tiktok.username) tiktok.connect().catch((e) => console.log('[tiktok]', e.message));
   if (process.env.TTS_SELFTEST !== '0') setTimeout(() => tts.selfTest().catch(() => {}), 3000).unref();

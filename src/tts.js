@@ -90,14 +90,16 @@ export class TTS {
   }
 
   /** Returns { id, url, duration, voice, via, ms } or null when TTS is off / every voice failed. */
-  async synth(text) {
-    const c = this.getConfig();
+  // o: { voice, rate, pitch } per game (Mira speaks in her own voice in the Haunted Tower)
+  async synth(text, o = {}) {
+    const c0 = this.getConfig();
+    const c = o.voice || o.rate || o.pitch ? { ...c0, ...Object.fromEntries(Object.entries(o).filter(([, v]) => v)) } : c0;
     if (!c.enabled) return null;
     const clean = speakableText(text);
     if (!clean) return null;
-    const voice = this.voiceFor(clean), t0 = Date.now();
+    const voice = o.voice || this.voiceFor(clean), t0 = Date.now();
     const parts = splitSpeech(clean, Math.min(190, c.pieceChars || 180));
-    let done = await Promise.all(parts.map((p) => this.piece(p, voice)));
+    let done = await Promise.all(parts.map((p) => this.piece(p, voice, c)));
     // one voice per line: if some piece had to use the Google voice, the whole line uses it (it takes ~0.3 s)
     if (c.mixVoices !== true && done.some((d) => d?.via === 'google') && done.some((d) => d?.via === 'edge')) {
       done = await Promise.all(parts.map((p, i) => (done[i]?.via === 'google' ? done[i] : this.google(p, voice).catch(() => done[i]))));
@@ -120,19 +122,18 @@ export class TTS {
   }
 
   /** One piece of a line: cache -> Edge (warm connection, retried) -> Google keyless voice if Edge is slow or fails. */
-  piece(text, voice) {
-    const key = voice + '|' + text;
+  piece(text, voice, c = this.getConfig()) {
+    const key = voice + '|' + (c.rate || '') + '|' + (c.pitch || '') + '|' + text;
     const hit = this.pieces.get(key);
     if (hit) { this.stats.cached++; this.pieces.delete(key); this.pieces.set(key, hit); return hit; }
-    const p = this.makePiece(text, voice).catch(() => null);
+    const p = this.makePiece(text, voice, c).catch(() => null);
     this.pieces.set(key, p);
     p.then((r) => { if (!r || r.via !== 'edge') this.pieces.delete(key); });   // Google pieces are not kept: next time try her real voice
     while (this.pieces.size > (this.getConfig().cachePieces || 500)) this.pieces.delete(this.pieces.keys().next().value);
     return p;
   }
 
-  async makePiece(text, voice) {
-    const c = this.getConfig();
+  async makePiece(text, voice, c = this.getConfig()) {
     const edge = (async () => {
       for (let i = 0; i < 2; i++) {
         try { const b = mp3Frames(await this.edge(text, voice, c)); if (b.duration > 0.15) { this.stats.edge++; return { ...b, via: 'edge' }; } throw new Error('empty audio'); }
