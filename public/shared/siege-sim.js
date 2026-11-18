@@ -196,15 +196,15 @@ export class Siege {
   // ------------------------------------------------------------------ session flow
   setPhase(p, sec) { this.phase = p; this.phaseStart = this.t; this.phaseEnd = this.t + sec; }
   startSession(first = false) {
-    this.run++; this.wave = (this.o.startChapter - 1) * WAVES_PER_CH; this.survivors = SURVIVORS; this.barrier = 40; this.hype = 0;
+    this.run++; this.wave = (this.o.startChapter - 1) * WAVES_PER_CH + (this.o.startWave || 0); this.survivors = SURVIVORS; this.barrier = 40; this.hype = 0;
     this.choices = []; this.fx = { spawnMul: 1, finalHp: 1, guardians: 0 }; this.voteIdx = -1; this.voteCounts = [0, 0];
     this.enemies = []; this.allies = []; this.hits = []; this.spawnLeft = 0; this.waveStart = 0; this.slotN = 0; this.post = 0; this.lost = 0;
     for (const [uid, m] of this.people) if (!m.bot && this.t - m.lastAct > 1200) { this.people.delete(uid); this.byId.delete(m.id); this.rDel.push(m.id); }
     for (const m of this.people.values()) { m.on = false; m.runPts = 0; m.vote = 0; m.ascT = -9; m.blessed = false; m.downT = 0; m.hp = 100; }
     for (const m of this.people.values()) if (!m.bot && this.t - m.lastAct < 180) this.join(m);
     // the anime cold-open (full lore on the first session and every third one; a short recap otherwise)
-    this.lore = this.o.introSeconds > 0 ? loreSeq(this.run).slice() : []; this.loreAt = this.t;
-    this.setPhase('intro', this.lore.length ? loreSeconds(this.run) : 0.5);
+    this.lore = this.o.introSeconds > 0 ? (this.o.loreCards || loreSeq(this.run)).slice() : []; this.loreAt = this.t;
+    this.setPhase('intro', this.lore.length ? this.lore.reduce((a, i) => a + LORE[i].sec, 0) + 1 : 0.5);
     this.emit({ k: 'intro', run: this.run, lore: this.lore.slice() });
   }
   startChapter() {

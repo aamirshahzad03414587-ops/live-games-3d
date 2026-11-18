@@ -1,4 +1,4 @@
-// iPhone-profile WebKit soak for an overlay (GAME=br | tower): a busy fake LIVE (200+ viewers, gifts, likes, follows,
+// iPhone-profile WebKit soak for an overlay (GAME=br | tower | siege): a busy fake LIVE (200+ viewers, gifts, likes, follows,
 // shares) runs on the server while WebKit (iPhone 13 profile) renders /br?mode=phone. Every 30 s it samples the
 // WebKit web process memory (PSS), frames drawn, renderer stats, quality level and the JS heap. At LOSE_AT minutes it
 // forces a WebGL context loss + restore to prove the recovery path.
@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 const { webkit, devices } = require(process.env.PLAYWRIGHT || '/tmp/shot/node_modules/playwright-core');
 const BASE = process.env.BASE || 'http://localhost:3940', MINUTES = Number(process.env.MINUTES || 10), OUT = process.env.OUT || 'screenshots/soak-webkit.json';
 const LOSE_AT = Number(process.env.LOSE_AT || 3), KEY = process.env.ADMIN_KEY || '';
-const GAME = process.env.GAME || 'br', G = GAME === 'tower' ? '__towerUI' : '__br';
+const GAME = process.env.GAME || 'br', G = GAME === 'tower' ? '__towerUI' : GAME === 'siege' ? '__siegeUI' : '__br';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const post = (p, body) => fetch(BASE + '/api/admin' + p, { method: 'POST', headers: { 'content-type': 'application/json', ...(KEY ? { 'x-admin-key': KEY } : {}) }, body: JSON.stringify(body || {}) }).then((r) => r.json()).catch((e) => ({ err: e.message }));
 // WebKitGTK on this Linux box has no media plugins: setting any <audio>.src crashes its web process (a test-machine
@@ -42,7 +42,7 @@ function pss() {
 }
 let lastRaf = 0, lastT = Date.now(), lostDone = false;
 async function sample(tMin) {
-  const p = await page.evaluate((g) => { const b = window[g]; const st = b.stats() || {}; return { kind: b.view.kind, level: b.level, fps: +b.fps.toFixed(1), phase: b.world.phase, floor: b.world.floor, fighters: (b.world.fighters || b.world.members).length, rooms: st.rooms, calls: st.calls, tris: st.tris, tex: st.tex, geo: st.geo, chars: st.chars, parts: st.parts, raf: window.__raf || 0, nodes: document.getElementsByTagName('*').length, snaps: b.N.snaps, ev: b.N.ev, errs: b.N.err, canvas: [document.getElementById('gl').width, document.getElementById('gl').height] }; }, G);
+  const p = await page.evaluate((g) => { const b = window[g]; const st = b.stats() || {}; return { kind: b.view.kind, level: b.level, fps: +b.fps.toFixed(1), phase: b.world.phase, floor: b.world.floor, wave: b.world.wv, survivors: b.world.sv, fighters: (b.world.fighters || b.world.members).length, rooms: st.rooms, calls: st.calls, tris: st.tris, tex: st.tex, geo: st.geo, chars: st.chars, parts: st.parts, raf: window.__raf || 0, nodes: document.getElementsByTagName('*').length, snaps: b.N.snaps, ev: b.N.ev, errs: b.N.err, canvas: [document.getElementById('gl').width, document.getElementById('gl').height] }; }, G);
   const now = Date.now(), rafFps = +((p.raf - lastRaf) / ((now - lastT) / 1000)).toFixed(1); lastRaf = p.raf; lastT = now;
   return { tMin: +tMin.toFixed(2), webProcessMB: pss(), rafFps, ...p, crashed };
 }
@@ -68,7 +68,7 @@ await post('/crowd', { mode: 'off' });
 const ok = samples.filter((s) => s.webProcessMB);
 const peak = (k) => Math.max(0, ...ok.map((x) => x[k] || 0));
 const firstMB = ok[2]?.webProcessMB, lastMB = ok.at(-1)?.webProcessMB;
-const summary = { game: GAME, minutes: MINUTES, maxFloor: peak('floor'), crashed, kind: ok[0]?.kind, canvas: ok[0]?.canvas, peakWebProcessMB: peak('webProcessMB'), webProcessMBat1min: firstMB, webProcessMBend: lastMB, driftMB: +(lastMB - firstMB).toFixed(1),
+const summary = { game: GAME, minutes: MINUTES, maxFloor: peak('floor'), maxWave: peak('wave'), minSurvivors: Math.min(...ok.map((x) => x.survivors ?? Infinity)), crashed, kind: ok[0]?.kind, canvas: ok[0]?.canvas, peakWebProcessMB: peak('webProcessMB'), webProcessMBat1min: firstMB, webProcessMBend: lastMB, driftMB: +(lastMB - firstMB).toFixed(1),
   maxFighters: peak('fighters'), maxCalls: peak('calls'), maxTris: peak('tris'), textures: ok.at(-1)?.tex, geometries: ok.at(-1)?.geo, avgRafFps: +(ok.slice(1).reduce((a, s) => a + (s.rafFps || 0), 0) / Math.max(1, ok.length - 1)).toFixed(1),
   levels: [...new Set(ok.map((s) => s.level))], contextLossTest: ctxTest, pageErrors: errs.slice(0, 10) };
 console.log('SUMMARY', JSON.stringify(summary));

@@ -196,7 +196,8 @@ const sayQ = [];
 let sayBusyUntil = 0, sayPending = 0;
 function startLocal() {
   const o = {};
-  for (const k of ['introSeconds', 'gatherSeconds', 'chapterSeconds', 'breakSeconds', 'victorySeconds', 'voteSeconds', 'choiceSeconds', 'endingSeconds', 'minDefenders', 'spawnMul', 'enemyHpMul', 'dmgMul', 'startChapter', 'waveCap', 'bossCap']) if (qs.has(k)) o[k] = Number(qs.get(k));
+  for (const k of ['introSeconds', 'gatherSeconds', 'chapterSeconds', 'breakSeconds', 'victorySeconds', 'voteSeconds', 'choiceSeconds', 'endingSeconds', 'minDefenders', 'spawnMul', 'enemyHpMul', 'dmgMul', 'startChapter', 'startWave', 'waveCap', 'bossCap', 'likePulse']) if (qs.has(k)) o[k] = Number(qs.get(k));
+  if (qs.get('lore')) o.loreCards = qs.get('lore').split(',').map(Number).filter((i) => i >= 0 && i < LORE.length);
   if (qs.get('bots') === '0') o.bots = false;
   let seed = Number(qs.get('seed') || 7);
   const rng = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
