@@ -6,7 +6,7 @@
 // - Lambert materials (cheap on mobile GPUs) + per-actor "flash" for hits, nothing allocated per frame
 import {
   Group, SkinnedMesh, Skeleton, Matrix4, MeshLambertMaterial, MeshBasicMaterial, Color, AnimationMixer, LoopOnce, LoopRepeat,
-  BufferAttribute, Box3, Sphere, Vector3, SRGBColorSpace, NearestMipmapLinearFilter, LinearFilter,
+  BufferAttribute, Sphere, Vector3, SRGBColorSpace, AdditiveBlending,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
@@ -122,8 +122,14 @@ export async function loadKit({ base = '/models', names = [], onProgress } = {})
     const key = name + ':' + tint + ':' + amount;
     let v = kit.variants.get(key);
     if (!v) {
-      const tc = new Color(tint), w = new Color(1, 1, 1).lerp(tc, amount);
-      v = t.mats.map((m) => { if (m.isMeshBasicMaterial) return m; const c = m.clone(); c.color.copy(w); kit.disposables.push(c); return c; });
+      if (typeof tint === 'string' && tint.startsWith('ghost')) {
+        // spectral variant: unlit, see-through, additive blue-white (fallen climbers, wraiths)
+        const col = tint === 'ghost-boss' ? 0xc9a8ff : 0xb8d4ff;
+        v = t.mats.map((m) => { const c = new MeshBasicMaterial({ map: m.map || null, color: col, transparent: true, opacity: 0.55, depthWrite: false, blending: AdditiveBlending, fog: true }); kit.disposables.push(c); return c; });
+      } else {
+        const tc = new Color(tint), w = new Color(1, 1, 1).lerp(tc, amount);
+        v = t.mats.map((m) => { if (m.isMeshBasicMaterial) return m; const c = m.clone(); c.color.copy(w); kit.disposables.push(c); return c; });
+      }
       v = v.length > 1 ? v : v[0]; kit.variants.set(key, v);
       if (kit.variants.size > 160) { /* keep the cache bounded: drop the oldest (its actors keep their material) */ const k0 = kit.variants.keys().next().value; kit.variants.delete(k0); }
     }
@@ -139,7 +145,8 @@ export async function loadKit({ base = '/models', names = [], onProgress } = {})
       const obj = skClone(t.tpl);
       let mesh = null; obj.traverse((o) => { if (o.isSkinnedMesh) mesh = o; });
       const mixer = new AnimationMixer(obj);
-      a = { name, obj, mesh, mixer, actions: new Map(), state: '', base: 'idle', until: 0, tint: undefined, acc: 0, flashT: -9 };
+      a = { name, obj, mesh, mixer, actions: new Map(), state: '', base: 'idle', until: 0, tint: undefined, acc: 0, flashT: -9, hand: null };
+      obj.traverse((o) => { if (o.isBone && /handslot.?l/i.test(o.name)) a.hand = o; });
       a.play = (state, now, { fade = 0.15, speed = 1 } = {}) => playState(kit, a, state, now, fade, speed);
     }
     if (a.tint !== tint) { a.mesh.material = kit.material(name, tint); a.tint = tint; }

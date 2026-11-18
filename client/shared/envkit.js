@@ -13,13 +13,13 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 export async function loadEnv(url) {
   const gltf = await new Promise((ok, bad) => loader.load(url, ok, undefined, bad));
   const root = gltf.scene; root.updateMatrixWorld(true);
-  const geos = new Map(); const disposables = []; let tex = null;
+  const geos = new Map(), texOf = new Map(), texs = new Set(); const disposables = []; let tex = null;
   for (const top of root.children) {
     const parts = []; // props sit at the origin; node transforms carry the de-quantization scale/offset -> bake them
     const inv = new Matrix4().copy(top.parent.matrixWorld).invert();
     top.traverse((o) => {
       if (!o.isMesh) return;
-      if (!tex && o.material.map) tex = o.material.map;
+      if (o.material.map) { if (!tex) tex = o.material.map; texOf.set(top.name, o.material.map); texs.add(o.material.map); }
       let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
       for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
       for (const k of ['position', 'normal', 'uv']) { const a = g.attributes[k]; if (!a || (a.array instanceof Float32Array && !a.normalized)) continue; const arr = new Float32Array(a.count * a.itemSize); for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) arr[i * a.itemSize + c] = GET[c].call(a, i); g.setAttribute(k, new BufferAttribute(arr, a.itemSize)); }
@@ -33,13 +33,16 @@ export async function loadEnv(url) {
     if (parts.length > 1) parts.forEach((p) => p.dispose());
     g.computeBoundingSphere(); geos.set(top.name, g); disposables.push(g);
   }
-  if (tex) { tex.colorSpace = SRGBColorSpace; tex.anisotropy = 4; disposables.push(tex); }
+  // one Lambert material per atlas texture (KayKit packs each use one atlas)
+  const mats = new Map();
+  for (const t of texs) { t.colorSpace = SRGBColorSpace; t.anisotropy = 4; disposables.push(t); const m = new MeshLambertMaterial({ map: t }); mats.set(t, m); disposables.push(m); }
   gltf.scene.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); } });
-  const mat = new MeshLambertMaterial({ map: tex }); disposables.push(mat);
+  const mat = mats.get(tex) || new MeshLambertMaterial(); if (!tex) disposables.push(mat);
+  const matOf = (name) => mats.get(texOf.get(name)) || mat;
   const env = {
-    geos, mat, has: (n) => geos.has(n),
+    geos, mat, matOf, has: (n) => geos.has(n),
     /** place many copies of a prop: items = [{x,y,z,ry,s}] -> one InstancedMesh */
-    instanced(name, items, { material = mat } = {}) {
+    instanced(name, items, { material = matOf(name) } = {}) {
       const g = geos.get(name); if (!g || !items.length) return null;
       const im = new InstancedMesh(g, material, items.length); const o = new Object3D();
       let maxR = 0;
