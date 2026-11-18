@@ -22,15 +22,15 @@ if (qs.get('clean') === '1') document.body.classList.add('clean');
 
 // ------------------------------------------------------------------ quality levels (auto by measured FPS)
 const QL = PHONE ? [
-  { pr: 1.5, maxW: 780, labels: 16, particles: 1, dust: true, props: true },
-  { pr: 1.25, maxW: 700, labels: 12, particles: 0.75, dust: true, props: true },
-  { pr: 1.0, maxW: 600, labels: 9, particles: 0.5, dust: false, props: true },
-  { pr: 0.8, maxW: 480, labels: 7, particles: 0.35, dust: false, props: false },
+  { pr: 1.5, maxW: 780, labels: 16, particles: 1, dust: true, props: true, chars: 64 },
+  { pr: 1.25, maxW: 700, labels: 12, particles: 0.75, dust: true, props: true, chars: 52 },
+  { pr: 1.0, maxW: 600, labels: 9, particles: 0.5, dust: false, props: true, chars: 42 },
+  { pr: 0.8, maxW: 480, labels: 7, particles: 0.35, dust: false, props: false, chars: 32 },
 ] : [
   { pr: 2, maxW: Number(qs.get('maxw')) || 1080, labels: 20, particles: 1, dust: true, props: true },
   { pr: 1.5, maxW: 900, labels: 16, particles: 1, dust: true, props: true },
-  { pr: 1.0, maxW: 700, labels: 12, particles: 0.6, dust: false, props: true },
-  { pr: 0.8, maxW: 540, labels: 9, particles: 0.4, dust: false, props: false },
+  { pr: 1.0, maxW: 700, labels: 12, particles: 0.6, dust: false, props: true, chars: 56 },
+  { pr: 0.8, maxW: 540, labels: 9, particles: 0.4, dust: false, props: false, chars: 44 },
 ];
 let level = qs.has('q') ? Math.max(0, Math.min(3, Number(qs.get('q')))) : 0;
 const fixedQ = qs.has('q');

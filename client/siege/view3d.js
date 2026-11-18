@@ -386,7 +386,8 @@ export function createSiegeView(canvas, opts = {}) {
   // ------------------------------------------------------------------ per-frame state
   const vis = new Map(), evis = new Map();
   const white = new Color(1, 1, 1), cA = new Color(), cB = new Color(), grey = new Color(0x707080), tmpV = new Vector3(), up = new Vector3(0, 1, 0);
-  let quality = { particles: 1, labels: 22, dust: true, props: true };
+  let quality = { particles: 1, labels: 22, dust: true, props: true, chars: 70 };
+  const capList = [];
   let time = 0, shake = 0, flashT = -9, barrierHit = -9, ultT = -9;
   let endState = null;   // { saved, t0 }
   const camPos = new Vector3(0, 13, 18), camLook = new Vector3(0, 1.5, -9), tgtPos = new Vector3(), tgtLook = new Vector3();
@@ -459,7 +460,10 @@ export function createSiegeView(canvas, opts = {}) {
 
     // ---------------- defenders
     drawn.length = 0;
-    const list = w.members.length > CAP ? w.members.slice(0, CAP) : w.members;
+    // draw cap by quality level (real viewers first; bots fill the rest). The others still fight in the sim.
+    const cap = Math.min(CAP, quality.chars || CAP);
+    let list = w.members;
+    if (list.length > cap) { list = capList; list.length = 0; for (const m of w.members) if (!(m.flags & 1) && list.length < cap) list.push(m); for (const m of w.members) if ((m.flags & 1) && list.length < cap) list.push(m); }
     let n = 0, hatN = 0, staffN = 0, swordN = 0, bowN = 0, haloN = 0;
     for (const m of list) {
       let s = vis.get(m.id);
