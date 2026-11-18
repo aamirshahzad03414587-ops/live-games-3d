@@ -26,6 +26,19 @@ export const ENEMIES = [
 export const EK = Object.fromEntries(ENEMIES.map((e, i) => [e.id, i]));
 
 // chapters: 3 waves + a boss each; a story vote after chapters 1 and 2 changes what comes next
+// the anime cold-open: one card per line, timed for the narrator (sec = how long the card holds)
+export const LORE = [
+  { title: 'THE DARK DIMENSION', text: 'A magic underworld has clashed with Earth.', say: 'The Dark Dimension... a magic underworld... has clashed with Earth.', sec: 5.5, art: 'rift' },
+  { title: 'A FATHER', text: 'A scientist, denied the cure for his daughter by a greedy boss. His wife and his brother — gone.', say: 'It began with a scientist. Denied the AIDS cure for his daughter by a greedy boss. His wife... and his brother... gone.', sec: 9, art: 'scientist' },
+  { title: 'THE BOOK & THE STONE', text: 'An ancient book. A dark teleport stone. His grief tore the Dark Dimension open at Earth’s core.', say: 'An ancient book. A dark teleport stone. His grief tore the Dark Dimension open, at the core of the Earth.', sec: 8, art: 'book' },
+  { title: '5,000,000,000 STOLEN', text: 'Five billion souls were stolen by a hidden Mastermind.', say: 'Five billion souls were stolen... by a hidden Mastermind.', sec: 5.5, art: 'souls' },
+  { title: 'THE SACRIFICE', text: 'The Lord of Earth gave 1.5 billion more to awaken the Ascension System.', say: 'The Lord of Earth sacrificed one and a half billion more... to awaken the Ascension System.', sec: 7, art: 'lord' },
+  { title: 'THE LAST CITADEL', text: '1.5 billion survivors remain. Beat the Dark Dimension — or they vanish forever.', say: 'One and a half billion survivors remain. Beat the Dark Dimension... or they vanish. Forever.', sec: 7, art: 'citadel' },
+];
+export const RECAP = [0, 5];   // later sessions: the short version
+export const loreSeq = (run) => (run % 3 === 1 ? LORE.map((_, i) => i) : RECAP);
+export const loreSeconds = (run) => loreSeq(run).reduce((s, i) => s + LORE[i].sec, 0) + 1;
+
 export const CHAPTERS = [
   { n: 1, title: 'THE RIFT OPENS', boss: { id: 'scientist', name: 'The Corrupted Scientist', hp: 1 } },
   { n: 2, title: 'ASCENSION', boss: { id: 'scientist2', name: 'The Scientist, Unbound', hp: 1.5 } },
@@ -54,8 +67,8 @@ export const SIEGE_GIFTS = [
   { id: 'dragon', min: 500, label: 'DRAGON ALLY', icon: '🐉', desc: 'a dragon burns the field; on a boss: 25% of its life' },
   { id: 'awaken', min: 100, label: 'ASCENSION', icon: '⚡', desc: 'screen-wide ultimate + you ascend (×3 power)' },
   { id: 'guardian', min: 30, label: 'GUARDIAN HERO', icon: '🛡️', desc: 'summons a golden guardian to the gate' },
-  { id: 'rune', min: 5, label: 'SHIELD RUNE', icon: '🔷', desc: '+30 barrier + a spell volley' },
-  { id: 'volley', min: 1, label: 'SPELL VOLLEY', icon: '✨', desc: '8 homing bolts from you' },
+  { id: 'rune', min: 5, label: 'SHIELD RUNE', icon: '🔷', desc: '+12 barrier + a spell volley' },
+  { id: 'volley', min: 1, label: 'SPELL VOLLEY', icon: '✨', desc: 'homing bolts from you (more coins, more bolts)' },
 ];
 export const siegeTier = (coins) => { const c = Number(coins) || 0; return SIEGE_GIFTS.find((t) => c >= t.min) || SIEGE_GIFTS[SIEGE_GIFTS.length - 1]; };
 

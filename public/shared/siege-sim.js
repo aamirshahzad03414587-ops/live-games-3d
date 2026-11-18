@@ -8,16 +8,16 @@
 // Likes charge the Ascension barrier (absorbs damage; every 500 likes = an Ascension pulse). Gifts: spell volley,
 // shield rune, guardian hero, Ascension ultimate, dragon ally. Follow / share = blessings.
 import { cleanName, colorFor, BOT_NAMES } from './commands.js';
-import { CLASSES, CLS, ENEMIES, EK, CHAPTERS, CHOICES, EFFECTS, SURVIVORS, siegeTier, parseSiege, WALL_Z, GATE_Z, RIFT_Z, FIELD_W } from './siege-data.js';
+import { CLASSES, CLS, ENEMIES, EK, CHAPTERS, CHOICES, EFFECTS, SURVIVORS, siegeTier, parseSiege, loreSeq, loreSeconds, LORE, WALL_Z, GATE_Z, RIFT_Z, FIELD_W } from './siege-data.js';
 
 export const SFLAG = { bot: 1, cmd: 2, asc: 4, bless: 8, down: 16, crown: 32, gift: 64 };
 export const FSHIFT = 2;   // f record: id, x, z, cls | flags << 2, hp
 export const SPH = ['intro', 'gather', 'chapter', 'wave', 'break', 'boss', 'victory', 'vote', 'choice', 'ending'];
 
 export const SIEGE_DEFAULTS = {
-  introSeconds: 11, gatherSeconds: 14, chapterSeconds: 4, breakSeconds: 5, victorySeconds: 4.5, voteSeconds: 16, choiceSeconds: 5.5, endingSeconds: 16,
+  introSeconds: 1, gatherSeconds: 14, chapterSeconds: 4, breakSeconds: 5, victorySeconds: 4.5, voteSeconds: 16, choiceSeconds: 5.5, endingSeconds: 16,
   minDefenders: 6, bots: true, waveCap: 70, bossCap: 100, sendCap: 70, enemySend: 90, enemyCap: 110,
-  spawnMul: 1, enemyHpMul: 1, dmgMul: 1, lossPer: 1_150_000, likeBarrier: 0.06, likePulse: 500, startChapter: 1,
+  spawnMul: 1, enemyHpMul: 1, dmgMul: 1, lossPer: 950_000, likeBarrier: 0.06, likePulse: 500, startChapter: 1,
 };
 const WAVES_PER_CH = 4;   // 3 waves + boss
 
@@ -202,8 +202,10 @@ export class Siege {
     for (const [uid, m] of this.people) if (!m.bot && this.t - m.lastAct > 1200) { this.people.delete(uid); this.byId.delete(m.id); this.rDel.push(m.id); }
     for (const m of this.people.values()) { m.on = false; m.runPts = 0; m.vote = 0; m.ascT = -9; m.blessed = false; m.downT = 0; m.hp = 100; }
     for (const m of this.people.values()) if (!m.bot && this.t - m.lastAct < 180) this.join(m);
-    this.setPhase('intro', first ? this.o.introSeconds : this.o.introSeconds);
-    this.emit({ k: 'intro', run: this.run });
+    // the anime cold-open (full lore on the first session and every third one; a short recap otherwise)
+    this.lore = this.o.introSeconds > 0 ? loreSeq(this.run).slice() : []; this.loreAt = this.t;
+    this.setPhase('intro', this.lore.length ? loreSeconds(this.run) : 0.5);
+    this.emit({ k: 'intro', run: this.run, lore: this.lore.slice() });
   }
   startChapter() {
     this.setPhase('chapter', this.o.chapterSeconds);
@@ -212,9 +214,9 @@ export class Siege {
   nextWave() {
     this.wave++;
     const ch = this.chapter, i = (this.wave - 1) % WAVES_PER_CH, party = Math.max(1, this.alive);
-    const sq = Math.sqrt(Math.min(party, 220) / 6), crowd = 0.5 + 0.5 * sq;
+    const sq = Math.sqrt(Math.min(party, 220) / 6), crowd = 0.45 + 0.65 * sq;
     this.hpCrowd = 0.6 + 0.4 * sq;
-    const count = Math.round((6 + 2.2 * this.wave) * crowd * this.fx.spawnMul * this.o.spawnMul);
+    const count = Math.round((6 + 1.6 * this.wave) * crowd * this.fx.spawnMul * this.o.spawnMul);
     this.waveStart = this.t;
     if (i === WAVES_PER_CH - 1) {
       const B = CHAPTERS[ch - 1].boss;
@@ -292,6 +294,7 @@ export class Siege {
       if (this.survivors <= 0) { this.survivors = 0; return this.endSession(false); }
     }
     if (ph === 'vote') this.botsVote(dt);
+    if (ph === 'intro' && this.lore.length && this.t >= this.loreAt) { const i = this.lore.shift(); this.loreAt = this.t + LORE[i].sec; this.emit({ k: 'lore', i, sec: LORE[i].sec }); }
     // the barrier slowly fades without likes (and healers top it up in combat)
     if (this.fighting()) this.barrier = Math.max(0, this.barrier - dt * 0.6);
     if (ph === 'wave' && this.waveCleared() && this.t - this.waveStart > 4) { this.setPhase('break', this.o.breakSeconds); this.emit({ k: 'clear', n: this.wave }); return; }
@@ -388,7 +391,7 @@ export class Siege {
       this.queueHit(m, e, C.dmg * mul, C.aoe, dist / speed, m.cls === CLS.mage ? 'm' : m.cls === CLS.archer ? 'a' : 'h');
     }
     // the open rift drains souls while its creatures roam the field (kill them fast!)
-    if (live.length) this.loseSurvivors(live.length * 0.012 * dt);
+    if (live.length) this.loseSurvivors(live.length * (0.004 + 0.008 * Math.min(1, this.alive / 60)) * dt);
     this.alliesStep(ground, live, dt);
     this.enemiesStep(dt);
     this.enemies = this.enemies.filter((e) => e.hp > 0);
