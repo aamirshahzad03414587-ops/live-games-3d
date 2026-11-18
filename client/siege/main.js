@@ -22,15 +22,15 @@ if (qs.get('clean') === '1') document.body.classList.add('clean');
 
 // ------------------------------------------------------------------ quality levels (auto by measured FPS)
 const QL = PHONE ? [
-  { pr: 1.5, maxW: 780, labels: 16, particles: 1, dust: true, props: true, chars: 64 },
-  { pr: 1.25, maxW: 700, labels: 12, particles: 0.75, dust: true, props: true, chars: 52 },
-  { pr: 1.0, maxW: 600, labels: 9, particles: 0.5, dust: false, props: true, chars: 42 },
-  { pr: 0.8, maxW: 480, labels: 7, particles: 0.35, dust: false, props: false, chars: 32 },
+  { pr: 1.5, maxW: 780, labels: 12, particles: 1, dust: true, props: true, chars: 36, animLod: 1 },
+  { pr: 1.25, maxW: 700, labels: 10, particles: 0.75, dust: true, props: true, chars: 30, animLod: 1 },
+  { pr: 1.0, maxW: 600, labels: 8, particles: 0.5, dust: false, props: true, chars: 24, animLod: 2 },
+  { pr: 0.8, maxW: 480, labels: 6, particles: 0.35, dust: false, props: false, chars: 16, animLod: 2 },
 ] : [
-  { pr: 2, maxW: Number(qs.get('maxw')) || 1080, labels: 20, particles: 1, dust: true, props: true },
-  { pr: 1.5, maxW: 900, labels: 16, particles: 1, dust: true, props: true },
-  { pr: 1.0, maxW: 700, labels: 12, particles: 0.6, dust: false, props: true, chars: 56 },
-  { pr: 0.8, maxW: 540, labels: 9, particles: 0.4, dust: false, props: false, chars: 44 },
+  { pr: 2, maxW: Number(qs.get('maxw')) || 1080, labels: 14, particles: 1, dust: true, props: true, chars: 60, animLod: 1 },
+  { pr: 1.5, maxW: 900, labels: 12, particles: 1, dust: true, props: true, chars: 48, animLod: 1 },
+  { pr: 1.0, maxW: 700, labels: 10, particles: 0.6, dust: false, props: true, chars: 36, animLod: 2 },
+  { pr: 0.8, maxW: 540, labels: 8, particles: 0.4, dust: false, props: false, chars: 24, animLod: 2 },
 ];
 let level = qs.has('q') ? Math.max(0, Math.min(3, Number(qs.get('q')))) : 0;
 const fixedQ = qs.has('q');
@@ -43,6 +43,7 @@ function makeView() {
   if (!want2d) {
     try {
       view = createSiegeView(canvas, { maxChars: 70, particles: PHONE ? 800 : 1200, aa: !PHONE || IOS, preserve: RENDER });
+      view.ready && view.ready.catch(() => mark('models-fail'));   // keeps the procedural look if the models can't load
       canvas.addEventListener('webglcontextlost', onLost, false);
       canvas.addEventListener('webglcontextrestored', onRestored, false);
       return;
@@ -59,7 +60,7 @@ function to2D() {
 function onLost(e) {
   e.preventDefault(); lost++; paused = true; mark('ctx-lost');
   lostTimes.push(performance.now()); lostTimes = lostTimes.filter((t) => performance.now() - t < 120e3);
-  showNotice('Graphics reset… recovering');
+  showNotice();
   clearTimeout(onLost.t); onLost.t = setTimeout(() => { if (paused) { localStorage.setItem('lg_force2d', '1'); to2D(); paused = false; hideNotice(); } }, 4000);
   diag && diag.send('ctxlost');
 }
@@ -118,16 +119,16 @@ function connect() {
     try { const b = JSON.parse(localStorage.getItem('lg_siegeBoard') || 'null'); if (b && b.json && b.sig) ws.send(JSON.stringify({ t: 'restore', json: b.json, sig: b.sig })); } catch {}
   };
   ws.onmessage = (m) => { let d; try { d = JSON.parse(m.data); } catch { return; } onMsg(d); };
-  ws.onclose = () => { ws = null; mark('ws-close'); setTimeout(connect, wsWait); wsWait = Math.min(10000, wsWait * 1.7); if (N.ws) showNotice('Reconnecting…'); };
+  ws.onclose = () => { ws = null; mark('ws-close'); setTimeout(connect, wsWait); wsWait = Math.min(10000, wsWait * 1.7); if (N.ws) showNotice(); };
   ws.onerror = () => {};
 }
 function onMsg(d) {
   switch (d.t) {
-    case 'hello': roster.clear(); applyRoster(d.roster); snaps = []; offset = null; tiers = d.tiers || tiers; renderGifts(); onBoard(d); pushSnap(d.snap); break;
+    case 'hello': roster.clear(); applyRoster(d.roster); snaps = []; offset = null; tiers = d.tiers || tiers; onBoard(d); pushSnap(d.snap); break;
     case 'roster': applyRoster(d.add, d.del); break;
     case 's': pushSnap(d); break;
     case 'say': say(d.text, d.url, d.dur); break;
-    case 'banner': banner(d.text); break;
+    case 'banner': break;   // big words are spoken now, not shown
     case 'board': onBoard(d); break;
     case 'status': tiktokState = d.tiktok?.state || ''; $('conn').className = tiktokState === 'connected' ? 'connected' : /wait|connecting|reconnect/.test(tiktokState) ? 'waiting' : tiktokState === 'error' ? 'error' : ''; maybeTikFinity(d.tiktok); break;
   }
@@ -221,7 +222,6 @@ function localWorld(dt, now) {
   return buildWorld(s, null, 0);
 }
 function localSay(l, now) {
-  if (l.banner) banner(l.banner);
   const item = { ...l, at: now, p: null };
   item.p = fetch('/api/say?voice=narrator&text=' + encodeURIComponent(l.text)).then((r) => r.json()).catch(() => ({ url: null }));
   sayPending++; item.p.finally(() => sayPending--);
@@ -243,9 +243,6 @@ async function pumpLocalSay(now) {
 const nameOf = (id) => roster.get(id)?.name || '?';
 const colorOf = (id) => '#' + ((roster.get(id)?.color ?? 0xffffff) >>> 0).toString(16).padStart(6, '0');
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const NB = (id) => `<span style="color:${colorOf(id)}">${esc(nameOf(id))}</span>`;
-const dmgNums = [];
-const lastPos = new Map();   // enemy id -> last projected position (pops outlive their creature)
 let shotSfxT = 0, hitSfxT = 0, voteSfxT = 0, killSfxT = 0;
 function handleEvent(e, stale) {
   N.ev++;
@@ -253,15 +250,15 @@ function handleEvent(e, stale) {
   const S = (k, v) => { if (!stale) audio.sfx(k, audio.now(), v); };
   const now = clockNow();
   switch (e.k) {
-    case 'intro': S('wind'); S('organ', 0.6); $('feed').innerHTML = ''; ending = null; lastChoice = null; showLore(-1); document.body.classList.add('cine'); break;
+    case 'intro': S('wind'); S('organ', 0.6); ending = null; lastChoice = null; showLore(-1); document.body.classList.add('cine'); break;
     case 'lore': S('bell', 0.5); S('whistle', 0.3); showLore(e.i, e.sec); break;
     case 'gather': S('go'); showLore(-1); document.body.classList.remove('cine'); break;
-    case 'chapter': S('bell'); S('organ'); chapterCard(e.n, e.title); break;
+    case 'chapter': S('bell'); S('organ'); break;
     case 'wave': S('roar', 0.6); S('heart', 0.6); break;
     case 'clear': S('chime'); S('cheer', 0.5); break;
     case 'boss': S('roar'); S('organ'); S('thunder'); break;
     case 'bossatk': S(e.kind === 'summon' ? 'roar' : 'boom', e.blocked ? 0.6 : 1); if (e.blocked) S('shield'); if (!e.blocked && e.kind !== 'summon') flash(0.35); break;
-    case 'bossdown': S('nuke'); S('fanfare'); S('cheer'); flash(0.8); if (!stale && e.by) feed('win', `⚔️ ${NB(e.by)} landed the final blow!`); break;
+    case 'bossdown': S('nuke'); S('fanfare'); S('cheer'); flash(0.8); break;
     case 'retreat': S('ghost'); S('thunder'); flash(0.4); break;
     case 'victory': break;
     case 'vote': if (e.start) { S('chime'); S('organ', 0.5); } else if (now - voteSfxT > 0.12) { voteSfxT = now; S('squeak', 0.35); } break;
@@ -271,7 +268,6 @@ function handleEvent(e, stale) {
       break;
     case 'dmg': {
       if (e.c && now - hitSfxT > 0.06) { hitSfxT = now; S(e.c === 2 ? 'crit' : 'punch', e.c === 2 ? 0.8 : 0.4); }
-      if (!stale && dmgNums.length < 34 && (e.c || dmgNums.length < 22)) dmgNums.push({ id: e.e, v: e.d, c: e.c, t0: now, j: (Math.random() - 0.5) * 2 });
       break;
     }
     case 'kill': if (now - killSfxT > 0.09) { killSfxT = now; S(e.q === 1 ? 'boom' : 'pop', e.q === 1 ? 0.7 : 0.4); } break;
@@ -281,107 +277,54 @@ function handleEvent(e, stale) {
     case 'down': S('ko', 0.4); break;
     case 'rise': S('heal', 0.4); break;
     case 'heal': break;
-    case 'gift': S('coin'); S(e.tier === 'dragon' ? 'roar' : e.tier === 'awaken' ? 'nuke' : e.tier === 'guardian' ? 'land' : 'power', e.tier === 'volley' ? 0.5 : 1); giftToast(e); if (e.tier === 'awaken' || e.tier === 'dragon') flash(0.6); break;
+    case 'gift': S('coin'); S(e.tier === 'dragon' ? 'roar' : e.tier === 'awaken' ? 'nuke' : e.tier === 'guardian' ? 'land' : 'power', e.tier === 'volley' ? 0.5 : 1); if (e.tier === 'awaken' || e.tier === 'dragon') flash(0.6); break;
     case 'ult': S('nuke'); flash(0.5); break;
-    case 'pulse': S('shield'); S('cheer', 0.5); toast('perk', '❤️ ASCENSION PULSE!', 'likes charged the barrier'); break;
-    case 'bless': S('power', 0.7); toast('perk', e.why === 'follow' ? `➕ ${esc(nameOf(e.id))} followed` : `🔁 ${esc(nameOf(e.id))} shared`, e.why === 'follow' ? '→ blessed ×1.2 + barrier' : '→ the fallen rise + barrier'); break;
-    case 'class': if (!stale && !roster.get(e.id)?.bot) feed('cls', `${CLASSES[e.c].icon} ${NB(e.id)} is now ${CLASSES[e.c].label}`); break;
+    case 'pulse': S('shield'); S('cheer', 0.5); break;
+    case 'bless': S('power', 0.7); break;
+    case 'class': break;
     case 'ally': break;
     case 'end': S(e.saved ? 'fanfare' : 'thunder'); S(e.saved ? 'cheer' : 'ghost'); if (e.saved) S('bell'); flash(0.9); ending = e; showEnd(e); break;
   }
   if (!['shot', 'dmg', 'kill', 'vote', 'heal'].includes(e.k)) mark(e.k);
 }
-function giftToast(e) {
-  const t = tiers.find((x) => x.id === e.tier) || {};
-  let sub = `→ ${t.label || e.tier}`;
-  if (e.tier === 'volley') sub = '→ ✨ spell volley';
-  if (e.tier === 'rune') sub = '→ 🔷 barrier + volley';
-  if (e.tier === 'guardian') sub = e.extended ? '→ 🛡️ guardian renewed' : '→ 🛡️ GUARDIAN HERO joins';
-  if (e.tier === 'awaken') sub = e.cool ? '→ ⚡ ascended ×3 power' : '→ ⚡ ASCENSION ULTIMATE!';
-  if (e.tier === 'dragon') sub = e.judgment ? '→ 🐉 JUDGMENT: −25% boss life' : '→ 🐉 DRAGON burns the field';
-  toast(e.tier, `${t.icon || '🎁'} ${esc(nameOf(e.id))} sent ${esc(e.giftName || 'a gift')}`, sub);
-}
 function clockNow() { return RENDER ? vclock : performance.now() / 1000; }
-function feed(cls, html) {
-  const el = document.createElement('div'); el.className = 'k ' + cls; el.innerHTML = html;
-  const f = $('feed'); f.prepend(el); while (f.children.length > 2) f.lastChild.remove();
-}
-function toast(kind, title, sub) {
-  const el = document.createElement('div'); el.className = 't ' + kind; el.innerHTML = `${title}<small>${sub}</small>`;
-  const t = $('toasts'); t.prepend(el); while (t.children.length > 2) t.lastChild.remove();
-  later(() => el.remove(), 3800);
-}
-let bannerT = 0;
-function banner(text) {
-  const b = $('banner'); b.hidden = false; b.classList.remove('show'); void b.offsetWidth; b.textContent = text; b.classList.add('show');
-  clearTimeout(bannerT); bannerT = later(() => { b.hidden = true; }, 1650);
-}
 function flash(op = 0.7) { const f = $('flash'); f.style.transition = 'none'; f.style.opacity = String(op); void f.offsetWidth; f.style.transition = 'opacity 0.9s ease-out'; f.style.opacity = '0'; }
+// the narrator speaks; nothing is written on screen
 let sayT = 0;
 function say(text, url, dur) {
   N.say++;
-  const el = $('say'); el.hidden = false; el.className = 'narr';
-  el.innerHTML = `<div class="txt"><span class="who">📜 THE NARRATOR</span>${esc(text)}</div>`;
   const ms = Math.max(1800, (dur || 2) * 1000 + 600);
-  clearTimeout(sayT); sayT = later(() => { el.hidden = true; }, ms);
+  clearTimeout(sayT); sayT = later(() => {}, ms);
   if (url) audio.voice(url, dur);
 }
-// anime cold-open cards
-const LORE_ART = { rift: '🌀', scientist: '🧪', book: '📖', souls: '👻', lord: '👑', citadel: '🏰' };
+// the cold open: full-bleed anime art with a slow push-in while the narrator tells the story (no words on screen)
 function showLore(i, sec = 5) {
   const el = $('lore');
   if (i < 0) { el.hidden = true; loreIdx = -1; return; }
   const L = LORE[i]; loreIdx = i; loreT = clockNow();
   el.hidden = false; el.className = 'art-' + L.art; el.style.setProperty('--sec', sec + 's');
   $('loreArt').style.backgroundImage = `url(/siege/lore-${L.art}.jpg), radial-gradient(circle at 50% 45%, #6a20b0, #1a0630 70%)`;
-  $('loreIcon').textContent = LORE_ART[L.art] || '✦';
-  $('loreTitle').textContent = L.title; $('loreText').textContent = L.text;
-  $('loreNum').textContent = `${String(i + 1).padStart(2, '0')} / ${String(LORE.length).padStart(2, '0')}`;
   el.classList.remove('play'); void el.offsetWidth; el.classList.add('play');
 }
-function chapterCard(n, title) {
-  const el = $('chapter'); $('chN').textContent = `CHAPTER ${n}`; $('chT').textContent = title;
-  $('chB').textContent = CHAPTERS[n - 1] ? `BOSS: ${CHAPTERS[n - 1].boss.name.toUpperCase()}` : '';
-  el.hidden = false; el.classList.remove('play'); void el.offsetWidth; el.classList.add('play');
-  later(() => { el.hidden = true; }, 3800);
-}
+const shortName = (n, max = 10) => { n = String(n || '?').replace(/\s+/g, ' ').trim(); return [...n].length > max ? [...n].slice(0, max - 1).join('') + '…' : n; };
+// the end card: an icon and the top defender's name (the narrator tells the ending)
 function showEnd(e) {
   const w = $('winner');
   w.className = e.saved ? 'saved' : 'fell';
-  $('winTitle').textContent = e.saved ? '🌅 EARTH SAVED' : '🌑 EARTH FELL';
-  $('winSurv').textContent = e.saved ? `${fmt(e.survivors)} survivors live on` : `the Dark Dimension took them all · wave ${e.wave}`;
+  $('winIcon').textContent = e.saved ? '🌅' : '🌑';
   const top = (e.top || []).filter((id) => roster.has(id));
-  if (top.length) { $('winName').textContent = nameOf(top[0]); $('winName').style.color = colorOf(top[0]); $('winSub').textContent = (top.length > 1 ? `with ${top.slice(1, 3).map(nameOf).join(' & ')} · ` : '') + (roster.get(top[0])?.bot ? 'bots led the defense – comment to beat them!' : 'TOP DEFENDER 🏆'); }
-  else { $('winName').textContent = ''; $('winSub').textContent = 'comment to defend the next siege'; }
-  const story = (e.choices || []).map((k) => { const C = CHOICES.find((c) => c.a.key === k || c.b.key === k); const o = C && (C.a.key === k ? C.a : C.b); return o ? `${o.icon} ${o.label}` : ''; }).filter(Boolean).join('  ·  ');
-  $('winStory').textContent = story;
+  $('winName').textContent = top.length ? shortName(nameOf(top[0]), 18) : ''; if (top.length) $('winName').style.color = colorOf(top[0]);
   w.hidden = false; w.style.animation = 'none'; void w.offsetWidth; w.style.animation = '';
-}
-function renderGifts() {
-  $('gifts').innerHTML = [...tiers].reverse().map((t) => `<div><span>${t.icon} ${esc(t.label)}</span><b>${t.min}🪙</b></div>`).join('');
 }
 function onBoard(d) {
   if (!d || (!d.session && !d.all)) return;
   board = d;
   if (d.signed) try { localStorage.setItem('lg_siegeBoard', JSON.stringify(d.signed)); } catch {}
 }
-let boardMode = 0, boardFlip = 0;
-function renderBoard(now) {
-  const show = ['gather', 'ending', 'break', 'chapter'].includes(world.phase);
-  const el = $('board'); el.hidden = !show; if (!show || !board) return;
-  if (now - boardFlip > 7) { boardFlip = now; boardMode ^= 1; }
-  const useAll = boardMode && board.all && board.all.length;
-  const list = (useAll ? board.all : board.session) || [];
-  const title = useAll ? `👑 ALL-TIME DEFENDERS${board.saves ? ` · 🌍×${board.saves}` : ''}` : "🛡️ TODAY'S DEFENDERS";
-  const html = list.length ? list.slice(0, 4).map((p) => `<li><span class="nm">${esc(p.name)}</span><span class="sc">${p.pts}⚔️${p.kills ? ' · ' + p.kills + '💀' : ''}</span></li>`).join('') : '';
-  const key = title + html;
-  if (el.__k === key) return; el.__k = key;
-  $('boardTitle').textContent = title;
-  $('boardList').innerHTML = html || '<div class="empty">No defenders yet – comment to take the wall! 🏰</div>';
-}
 
-// ------------------------------------------------------------------ HUD canvas: name tags + anime damage pops
-const CLS_ICON = CLASSES.map((c) => c.icon);
+// ------------------------------------------------------------------ HUD canvas: short name tags, one small ring (time + barrier),
+// a 🌍 survivors counter, a thin boss bar and, during the story vote, two icon bars. No sentences anywhere.
+let ringPhase = '', ringMax = {};
 function drawHud(now) {
   const pr = hud.__pr || 1, u = cssW / 100;
   hg.setTransform(1, 0, 0, 1, 0, 0); hg.clearRect(0, 0, hud.width, hud.height); hg.setTransform(pr, 0, 0, pr, 0, 0);
@@ -389,146 +332,117 @@ function drawHud(now) {
   const w = world, q = QL[level];
   hg.textAlign = 'center'; hg.textBaseline = 'middle'; hg.lineJoin = 'round';
   const F = (wt, px) => `${wt} ${px}px -apple-system, "Segoe UI", Roboto, sans-serif`;
-  // name tags (priority: active commenters, crown, gifters, humans); bots only when there is room
-  if (w.phase !== 'intro') {
-    const drawn = view.drawn() || [];
-    const cand = drawn.map((f) => ({ f, s: (f.flags & SFLAG.cmd ? 8 : 0) + (f.flags & SFLAG.crown ? 7 : 0) + (f.flags & SFLAG.gift ? 6 : 0) + (f.flags & SFLAG.asc ? 5 : 0) + (f.flags & SFLAG.bot ? 0 : 3) }));
-    cand.sort((a, b) => b.s - a.s);
-    const fs = Math.round(u * (cand.length > 14 ? 2.4 : 2.8));
-    const placed = [];
-    for (const { f } of cand.slice(0, q.labels)) {
-      const p = view.project(f.x, f.y, f.z); if (!p.vis) continue;
-      if (p.x < -40 || p.x > cssW + 40 || p.y < cssH * 0.3 || p.y > cssH * 0.92) continue;
-      if (placed.some((o) => Math.abs(o.x - p.x) < u * 10 && Math.abs(o.y - p.y) < u * 3.6)) continue;
-      placed.push(p);
-      const info = f.info || {}, bot = f.flags & SFLAG.bot, down = f.flags & SFLAG.down;
-      const name = (f.flags & SFLAG.crown ? '👑 ' : bot ? '🤖 ' : '') + (CLS_ICON[f.cls] || '') + ' ' + info.name + (f.flags & SFLAG.asc ? ' ⚡' : '') + (f.flags & SFLAG.bless ? ' ✨' : '');
-      hg.font = F(800, fs);
-      const tw = Math.min(hg.measureText(name).width, u * 30), h = fs * 1.35, y = p.y - h * 0.6;
-      hg.globalAlpha = down ? 0.55 : 1;
-      hg.fillStyle = f.flags & SFLAG.asc ? 'rgba(120,80,0,0.85)' : bot ? 'rgba(40,40,60,0.7)' : 'rgba(14,6,34,0.8)';
-      rr(p.x - tw / 2 - u * 1.3, y - h / 2, tw + u * 2.6, h, h / 2); hg.fill();
-      hg.fillStyle = '#' + ((info.color ?? 0xffffff) >>> 0).toString(16).padStart(6, '0');
-      rr(p.x - tw / 2 - u * 1.3, y - h / 2, u * 0.9, h, u * 0.45); hg.fill();
-      hg.fillStyle = bot ? '#c8c8d8' : '#fff';
-      hg.fillText(name, p.x + u * 0.2, y + 1, u * 30);
-      if (f.cls === 1 && f.hp < 100 && !down) { hg.fillStyle = 'rgba(0,0,0,0.6)'; hg.fillRect(p.x - u * 4, y + h * 0.62, u * 8, u * 0.8); hg.fillStyle = f.hp > 40 ? '#5dff9a' : '#ff5a5a'; hg.fillRect(p.x - u * 4, y + h * 0.62, u * 8 * Math.max(0, f.hp) / 100, u * 0.8); }
-      hg.globalAlpha = 1;
-    }
+  if (w.phase === 'intro') return;   // the cold open is pure picture + voice
+  const drawn = view.drawn() || [];
+  const cand = drawn.map((f) => ({ f, s: (f.flags & SFLAG.cmd ? 8 : 0) + (f.flags & SFLAG.crown ? 7 : 0) + (f.flags & SFLAG.gift ? 6 : 0) + (f.flags & SFLAG.asc ? 5 : 0) + (f.flags & SFLAG.bot ? 0 : 3) }));
+  cand.sort((a, b) => b.s - a.s);
+  const crowded = cand.length > 12, fs = Math.round(u * (crowded ? 2.3 : 2.6));
+  const placed = []; let shown = 0;
+  for (const { f } of cand) {
+    if (shown >= Math.min(q.labels, 12)) break;
+    const p = view.project(f.x, f.y, f.z); if (!p.vis) continue;
+    if (p.x < u * 4 || p.x > cssW - u * 4 || p.y < cssH * 0.26 || p.y > cssH * 0.8) continue;
+    if (placed.some((o) => Math.abs(o.x - p.x) < u * 10 && Math.abs(o.y - p.y) < u * 3.4)) continue;
+    placed.push(p); shown++;
+    const info = f.info || {}, bot = f.flags & SFLAG.bot, down = f.flags & SFLAG.down;
+    const name = (f.flags & SFLAG.crown ? '👑' : '') + shortName(bot ? String(info.name || '').replace(/^Bot\s+/i, '') : info.name, crowded ? 8 : 10);
+    hg.globalAlpha = (down ? 0.4 : bot ? 0.55 : 0.92) * (1 - Math.min(0.5, shown / 24));
+    hg.font = F(700, fs);
+    const tw = Math.min(hg.measureText(name).width, u * 22), h = fs * 1.3, y = p.y - h * 0.4;
+    hg.fillStyle = f.flags & SFLAG.asc ? 'rgba(120,80,0,0.6)' : 'rgba(8,4,20,0.5)'; rr(p.x - tw / 2 - u, y - h / 2, tw + u * 2, h, h / 2); hg.fill();
+    hg.fillStyle = '#' + ((info.color ?? 0xffffff) >>> 0).toString(16).padStart(6, '0');
+    hg.fillText(name, p.x, y + 1, u * 22);
+    if (f.cls === 1 && f.hp < 100 && !down) { hg.fillStyle = 'rgba(0,0,0,0.55)'; hg.fillRect(p.x - u * 3.5, y + h * 0.6, u * 7, u * 0.5); hg.fillStyle = f.hp > 40 ? '#5dff9a' : '#ff5a5a'; hg.fillRect(p.x - u * 3.5, y + h * 0.6, u * 7 * Math.max(0, f.hp) / 100, u * 0.5); }
   }
-  // anime damage pops: punchy scale-in, crits get a starburst + "CRIT!"
-  for (let i = dmgNums.length - 1; i >= 0; i--) {
-    const d = dmgNums[i], k = (now - d.t0) / (d.c === 2 ? 0.95 : 0.7);
-    let p = view.enemyTop(d.id);
-    if (p) lastPos.set(d.id, p); else p = lastPos.get(d.id);
-    if (k >= 1 || k < 0 || !p) { dmgNums.splice(i, 1); continue; }
-    const pop = 1 + (d.c === 2 ? 1.3 : 0.7) * Math.pow(Math.max(0, 1 - k * 5), 2);
-    const size = u * (d.c === 2 ? 6.8 : d.c === 1 ? 4.6 : 3.4) * pop;
-    const x = p.x + d.j * u * 7, y = p.y - u * 2 - k * u * (d.c === 2 ? 9 : 7);
-    hg.globalAlpha = Math.min(1, (1 - k) * 2.4);
-    if (d.c === 2) {
-      hg.save(); hg.translate(x, y); hg.rotate(-0.12); hg.fillStyle = 'rgba(255,60,40,0.9)'; hg.beginPath();
-      for (let s = 0; s < 16; s++) { const a = s / 16 * Math.PI * 2, r = (s % 2 ? 0.55 : 1) * size * 1.05; hg.lineTo(Math.cos(a) * r * 1.35, Math.sin(a) * r * 0.8); }
-      hg.closePath(); hg.fill(); hg.restore();
-    }
-    const t = String(d.v) + (d.c === 2 ? '!' : '');
-    hg.font = `italic ${F(900, size)}`;
-    hg.lineWidth = size * 0.22; hg.strokeStyle = d.c === 2 ? '#3a0000' : 'rgba(30,0,40,0.9)'; hg.strokeText(t, x, y);
-    hg.fillStyle = d.c === 2 ? '#fff23a' : d.c === 1 ? '#ffb03a' : '#ffffff'; hg.fillText(t, x, y);
-    if (d.c === 2 && k < 0.6) { hg.font = `italic ${F(900, u * 2.6)}`; hg.lineWidth = u * 0.6; hg.strokeStyle = '#3a0000'; hg.strokeText('CRIT', x, y - size * 0.75); hg.fillStyle = '#fff'; hg.fillText('CRIT', x, y - size * 0.75); }
-  }
-  if (lastPos.size > 200) lastPos.clear();
   hg.globalAlpha = 1;
+  drawRing(now, u, F);
+}
+const compact = (n) => (n >= 1e9 ? (n / 1e9).toFixed(2) + 'B' : n >= 1e6 ? Math.round(n / 1e6) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'K' : String(Math.max(0, Math.round(n))));
+function drawRing(now, u, F) {
+  const w = world, ph = w.phase;
+  if (ph !== ringPhase) { ringPhase = ph; ringMax[ph] = Math.max(1, w.tl || 1); }
+  if (w.tl > ringMax[ph]) ringMax[ph] = w.tl;
+  const cx = cssW / 2, cy = cssH * 0.135, r = u * 4.6;
+  const timed = ['gather', 'vote', 'boss', 'break', 'wave'].includes(ph) && w.tl > 0;
+  const k = timed ? Math.max(0, Math.min(1, w.tl / (ringMax[ph] || 1))) : 1;
+  const bar = Math.max(0, Math.min(100, w.bar || 0)) / 100;
+  const urgent = (ph === 'vote' || ph === 'gather') && w.tl > 0 && w.tl <= 5 && !(ph === 'gather' && w.n < 1);
+  const boss = !!(w.bo && ['wave', 'boss', 'break', 'victory'].includes(ph));
+  const col = boss ? '#ff6b8b' : ph === 'vote' || ph === 'choice' ? '#ffd36a' : '#c77dff';
+  const pulse = urgent ? 1 + 0.12 * Math.max(0, Math.sin((w.tl % 1) * Math.PI)) : 1;
+  hg.save(); hg.translate(cx, cy); hg.scale(pulse, pulse);
+  hg.fillStyle = 'rgba(10,6,24,0.55)'; hg.beginPath(); hg.arc(0, 0, r + u * 2.1, 0, Math.PI * 2); hg.fill();
+  hg.lineCap = 'round'; hg.lineWidth = u * 1.1;
+  hg.strokeStyle = 'rgba(255,255,255,0.16)'; hg.beginPath(); hg.arc(0, 0, r, 0, Math.PI * 2); hg.stroke();
+  hg.strokeStyle = col; hg.beginPath(); hg.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); hg.stroke();
+  // the Ascension barrier (charged by likes)
+  hg.lineWidth = u * 0.7;
+  hg.strokeStyle = 'rgba(122,216,255,0.18)'; hg.beginPath(); hg.arc(0, 0, r + u * 1.35, 0, Math.PI * 2); hg.stroke();
+  hg.strokeStyle = '#7ad8ff'; if (bar > 0) { hg.beginPath(); hg.arc(0, 0, r + u * 1.35, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * bar); hg.stroke(); }
+  hg.fillStyle = '#fff';
+  if (urgent) { hg.font = F(900, Math.round(u * 4.4)); hg.fillText(String(Math.ceil(w.tl)), 0, u * 0.3); }
+  else { hg.font = `${Math.round(u * 4)}px sans-serif`; hg.fillText(ph === 'vote' || ph === 'choice' ? '🗳️' : boss ? '💀' : ph === 'ending' ? (ending && ending.saved ? '🌅' : '🌑') : '🛡️', 0, u * 0.3); }
+  hg.restore();
+  // survivors: globe icon + compact number, under the ring; it shakes red when souls are taken
+  const sv = Math.max(0, svShown), frac = sv / SURVIVORS, hit = Math.max(0, 1 - (now - svHitT) / 0.6);
+  hg.font = F(900, Math.round(u * 3.2));
+  const txt = '🌍 ' + compact(sv), tw = hg.measureText(txt).width;
+  const sy = cy + r + u * 5, sx = cx + (hit > 0 ? (Math.random() - 0.5) * u * hit : 0);
+  hg.fillStyle = 'rgba(10,6,24,0.55)'; rr(sx - tw / 2 - u * 1.4, sy - u * 2.3, tw + u * 2.8, u * 4.6, u * 2.3); hg.fill();
+  hg.fillStyle = hit > 0 ? '#ff6a6a' : frac < 0.35 ? '#ff9a7a' : frac < 0.7 ? '#ffd36a' : '#e8f4ff';
+  hg.fillText(txt, sx, sy + u * 0.2);
+  let y2 = sy + u * 4;
+  if (boss) {
+    const bw = u * 26, f2 = Math.max(0, Math.min(1, w.bo.hp / w.bo.max));
+    hg.fillStyle = 'rgba(10,6,24,0.6)'; rr(cx - bw / 2, y2, bw, u * 1.4, u * 0.7); hg.fill();
+    hg.fillStyle = '#ff3a6a'; if (f2 > 0) { rr(cx - bw / 2, y2, bw * f2, u * 1.4, u * 0.7); hg.fill(); }
+    y2 += u * 3;
+  }
+  // the story vote: two icon bars with the option numbers (the narrator reads the question)
+  if ((ph === 'vote' || ph === 'choice') && w.vi >= 0 && CHOICES[w.vi]) {
+    const C = CHOICES[w.vi], tot = (w.vc[0] || 0) + (w.vc[1] || 0) || 1, picked = ph === 'choice' && lastChoice ? lastChoice.key : null;
+    [C.a, C.b].forEach((o, i) => {
+      const x = cx + (i ? 1 : -1) * u * 16, y = cssH * 0.3, bw = u * 26, f2 = (w.vc[i] || 0) / tot;
+      hg.globalAlpha = picked && picked !== o.key ? 0.35 : 1;
+      hg.fillStyle = 'rgba(10,6,24,0.6)'; rr(x - bw / 2, y - u * 4, bw, u * 8, u * 4); hg.fill();
+      hg.fillStyle = i ? 'rgba(255,90,120,0.55)' : 'rgba(122,216,255,0.55)'; if (f2 > 0) { rr(x - bw / 2, y - u * 4, Math.max(u * 8, bw * f2), u * 8, u * 4); hg.fill(); }
+      hg.fillStyle = '#ffd36a'; hg.font = F(900, Math.round(u * 5)); hg.fillText(String(i + 1), x - bw * 0.26, y + u * 0.3);
+      hg.font = `${Math.round(u * 5)}px sans-serif`; hg.fillText(o.icon, x + bw * 0.18, y + u * 0.3);
+      if (picked === o.key) { hg.strokeStyle = '#ffd36a'; hg.lineWidth = u * 0.6; rr(x - bw / 2, y - u * 4, bw, u * 8, u * 4); hg.stroke(); }
+      hg.globalAlpha = 1;
+    });
+  }
 }
 function rr(x, y, w, h, r) { hg.beginPath(); hg.moveTo(x + r, y); hg.arcTo(x + w, y, x + w, y + h, r); hg.arcTo(x + w, y + h, x, y + h, r); hg.arcTo(x, y + h, x, y, r); hg.arcTo(x, y, x + w, y, r); hg.closePath(); }
 
-// ------------------------------------------------------------------ DOM HUD (4x a second; the survivor counter rolls every frame)
-let lastCount = -1, svShown = SURVIVORS, svTarget = SURVIVORS, svDropAcc = 0, svDropT = 0, lastSv = SURVIVORS;
-function setText(id, t) { const el = $(id); if (el.__t !== t) { el.__t = t; el.textContent = t; } }
+// ------------------------------------------------------------------ survivors counter (rolls every frame) + sounds/classes (4x a second)
+let lastCount = -1, svShown = SURVIVORS, svTarget = SURVIVORS, lastSv = SURVIVORS, svHitT = -9;
 function rollCounter(dt, now) {
   svTarget = Math.max(0, world.sv ?? SURVIVORS);
-  if (svTarget < lastSv - 1) { svDropAcc += lastSv - svTarget; if (now - svDropT > 0.6) { showDrop(svDropAcc); svDropAcc = 0; svDropT = now; } }
+  if (svTarget < lastSv - 2e5) svHitT = now;
   if (svTarget > lastSv + 1e6 || svTarget >= SURVIVORS - 1) svShown = Math.min(svShown, SURVIVORS);
   lastSv = svTarget;
   svShown += (svTarget - svShown) * Math.min(1, dt * 6);
   if (Math.abs(svTarget - svShown) < 1000) svShown = svTarget;
-  setText('svN', fmt(svShown));
-  const frac = svShown / SURVIVORS, el = $('surv');
-  el.classList.toggle('low', frac < 0.35); el.classList.toggle('mid', frac >= 0.35 && frac < 0.7);
-  $('svBar').style.width = (frac * 100).toFixed(2) + '%';
-}
-function showDrop(n) {
-  if (n < 2e5) return;
-  const el = document.createElement('div'); el.className = 'drop'; el.textContent = '−' + fmt(n);
-  $('surv').appendChild(el); later(() => el.remove(), 1300);
-  const s = $('surv'); s.classList.remove('hit'); void s.offsetWidth; s.classList.add('hit');
 }
 function domHud(now) {
   const w = world, body = document.body;
-  const fight = ['wave', 'boss', 'break', 'victory'].includes(w.phase);
   const cine = w.phase === 'intro';
   body.classList.toggle('cine', cine);
-  // how-to banner follows the phase
-  let title = '💬 COMMENT TO DEFEND!', cls = '', chips = ['🔮⚔️🏹💚 type a class', '❤️ likes = barrier'];
-  if (w.phase === 'gather' || w.phase === 'ending' || cine) { title = '🏰 COMMENT TO JOIN!'; cls = 'join'; chips = ['type mage · warrior · archer · healer', '❤️ likes = barrier', '➕ follow = blessing']; }
-  else if (w.phase === 'vote') { title = '🗳️ COMMENT 1 OR 2!'; cls = 'vote'; chips = ['the story changes for good']; }
-  else if (w.phase === 'boss') { title = '💥 BOSS! SPAM CHAT!'; cls = 'fight'; chips = ['💬 comments = haste', '🐉 500🪙 = judgment']; }
-  else if (fight) { title = '💬 CHAT = FASTER ATTACKS'; cls = 'fight'; chips = ['🔮 mage · ⚔️ warrior · 🏹 archer · 💚 healer', '❤️ likes = barrier']; }
-  const ck = chips.join('|'); if ($('howChips').__k !== ck) { $('howChips').__k = ck; $('howChips').innerHTML = chips.map((c) => `<span>${esc(c)}</span>`).join(''); }
-  setText('howTitle', title); $('howTitle').className = 'title' + (cls ? ' ' + cls : '');
-  // pill
-  let txt;
-  const C = CHAPTERS[(w.ch || 1) - 1];
-  if (w.phase === 'gather') txt = `🏰 SIEGE #${w.run} IN ${Math.ceil(w.tl)}s · 👥 ${w.n} defenders`;
-  else if (w.phase === 'intro') txt = '🌌 THE DARK DIMENSION';
-  else if (w.phase === 'ending') txt = ending && ending.saved ? '🌅 EARTH SAVED · a new siege soon' : '🌑 EARTH FELL · a new siege soon';
-  else if (w.phase === 'vote' || w.phase === 'choice') txt = `🗳️ THE STORY CHOICE · ⏳${Math.ceil(w.tl)}s`;
-  else if (w.phase === 'boss') txt = `CH ${w.ch} · 💀 BOSS · ⏳${Math.ceil(w.tl)}s · 👥 ${w.n}`;
-  else txt = `CH ${w.ch} · WAVE ${w.wv}${w.left ? ` · 👹 ${w.left}` : ''} · 👥 ${w.n}`;
-  setText('pillTxt', txt);
-  $('pill').className = w.phase === 'boss' ? 'boss' : w.phase === 'ending' ? 'end' : w.phase;
-  // barrier
-  const bar = Math.max(0, Math.min(100, w.bar || 0));
-  $('barBar').style.width = bar.toFixed(1) + '%'; setText('barN', Math.round(bar) + '%');
-  $('barrier').className = bar < 15 && fight ? 'low' : '';
-  setText('likeN', String(w.hype || 0)); $('likeBar').style.width = Math.min(100, ((w.hype || 0) / 500) * 100) + '%';
-  // boss bar
-  const bb = $('bossbar'); bb.hidden = !(w.bo && fight);
-  if (!bb.hidden) { setText('bossName', `💀 ${w.bo.n.toUpperCase()}`); setText('bossHpN', fmt(Math.max(0, Math.ceil(w.bo.hp)))); $('bossHp').style.width = Math.max(0, (w.bo.hp / w.bo.max) * 100).toFixed(1) + '%'; }
-  body.classList.toggle('bossing', !bb.hidden);
-  // story vote card
-  const vc = $('vote'), voting = w.phase === 'vote' || w.phase === 'choice';
-  vc.hidden = !voting || w.vi < 0;
-  if (!vc.hidden) {
-    const Cq = CHOICES[w.vi], tot = (w.vc[0] || 0) + (w.vc[1] || 0) || 1;
-    setText('voteQ', Cq.q);
-    const picked = w.phase === 'choice' && lastChoice ? lastChoice.key : null;
-    [['a', 0], ['b', 1]].forEach(([s, i]) => {
-      const o = Cq[s], el = $('vo' + i);
-      setText('voL' + i, `${o.icon} ${o.label}`); setText('voN' + i, String(w.vc[i] || 0));
-      $('voB' + i).style.width = ((w.vc[i] || 0) / tot * 100).toFixed(1) + '%';
-      el.classList.toggle('lead', !picked && (w.vc[i] || 0) > (w.vc[1 - i] || 0));
-      el.classList.toggle('picked', picked === o.key); el.classList.toggle('lost', !!picked && picked !== o.key);
-    });
-    setText('voteT', picked ? EFFECTS[picked].text : `comment 1 or 2 · ⏳${Math.ceil(w.tl)}s`);
-  }
-  body.classList.toggle('voting', voting);
-  // big countdown: the last 5 s of a vote and of the muster
-  const c = $('count');
+  body.classList.toggle('voting', w.phase === 'vote' || w.phase === 'choice');
   if ((w.phase === 'vote' || w.phase === 'gather') && w.tl <= 5.0 && w.tl > 0 && !(w.phase === 'gather' && w.n < 1)) {
     const n = Math.ceil(w.tl);
-    if (n !== lastCount) { lastCount = n; c.hidden = false; c.textContent = n; c.classList.remove('tick'); void c.offsetWidth; c.classList.add('tick'); audio.sfx(w.phase === 'vote' && n <= 3 ? 'heart' : 'beep'); }
-  } else { if (!c.hidden) c.hidden = true; lastCount = -1; }
+    if (n !== lastCount) { lastCount = n; audio.sfx(w.phase === 'vote' && n <= 3 ? 'heart' : 'beep'); }
+  } else lastCount = -1;
   if (w.phase !== 'ending') $('winner').hidden = true;
   if (w.phase !== 'intro' && !$('lore').hidden) showLore(-1);
-  renderBoard(now);
 }
 
 // ------------------------------------------------------------------ timers that follow the virtual clock in render mode
 const timers = [];
 function later(fn, ms) { if (!RENDER) return setTimeout(fn, ms); const t = { at: vclock + ms / 1000, fn }; timers.push(t); return t; }
 function runTimers() { for (let i = timers.length - 1; i >= 0; i--) if (timers[i].at <= vclock) { const t = timers.splice(i, 1)[0]; t.fn(); } }
-function showNotice(t) { const n = $('notice'); n.textContent = t; n.hidden = false; }
+function showNotice() { $('notice').hidden = false; }   // a small spinner icon, no words
 function hideNotice() { $('notice').hidden = true; }
 
 // ------------------------------------------------------------------ main loop + auto quality
@@ -569,6 +483,7 @@ if (RENDER) {
   window.__render = {
     async frame(dt) {
       vclock += dt; runTimers();
+      if (view && view.ready && !view.loaded && !view.error) await view.ready.catch(() => {});
       for (let i = 0; i < 100 && (pumpLocalSay.busy || (sayQ.length && sayQ[0].p && sayPending)); i++) await new Promise((r) => setTimeout(r, 30));
       tick(dt, vclock);
       return { phase: world.phase, n: world.n, ch: world.ch, wave: world.wv, sv: world.sv };
@@ -592,7 +507,7 @@ function maybeTikFinity(t) {
 let diag = null;
 makeView();
 resize();
-renderGifts();
+
 if (LOCAL) { startLocal(); board = { session: [], all: [] }; } else connect();
 if (!RENDER) {
   requestAnimationFrame(loop);

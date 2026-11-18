@@ -1,5 +1,6 @@
 // The Narrator of Dark Dimension Siege: events -> short spoken lines (+ an optional big banner word).
-// A deep, calm, anime-trailer voice. Shared by the server (LIVE) and the overlay's local/demo mode.
+// A deep, calm, anime-trailer voice. Nothing is written on screen any more, so the narrator also explains how to play
+// and what each gift does (rotating tips in quiet moments). Shared by the server (LIVE) and the overlay's local/demo mode.
 import { LORE, CHAPTERS, CHOICES, EFFECTS, ENDINGS, CLASSES } from './siege-data.js';
 const pick = (arr, rng) => arr[Math.floor(rng() * arr.length) % arr.length];
 /** 1234567890 -> "1.23 billion" / "640 million" (spoken) */
@@ -21,12 +22,26 @@ const BOSS_DOWN = {
 export function makeSiegeLines({ nameOf, rng = Math.random, survivors = () => 1.5e9 }) {
   const joins = []; let joinAt = 0, ms = 0;
   const L = (text, pri, banner, extra = {}) => ({ text, pri, banner: banner || null, ...extra });
+  const TIPS = {
+    gather: [
+      'To defend the wall, comment mage, warrior, archer or healer. Or just comment anything to join.',
+      'Mages throw fire. Warriors hold the gate. Archers shoot the flying wraiths. Healers keep everyone alive.',
+      'Likes charge the Ascension barrier. Keep tapping the screen!',
+      'Gifts are power. Any small gift fires a spell volley. Five coins carves a shield rune. Thirty coins summons a golden guardian.',
+      'One hundred coins awakens the Ascension ultimate. Five hundred coins calls the dragon!',
+      'Follow for a blessing. Share the live and the fallen rise again.',
+    ],
+    fight: ['Likes charge the barrier! Tap, tap, tap!', 'Comment a class to switch: mage, warrior, archer or healer.', 'Send a gift for a spell volley right now!', 'Every survivor counts. Do not let them reach the wall!'],
+  };
+  let phase = 'gather', lastSaid = -99, tipAt = 0; const tipN = { gather: 0, fight: 0 }; const QUIET = { gather: [5, 7], fight: [10, 15] };
   const list = (ids) => { const n = ids.map(nameOf).filter(Boolean); if (!n.length) return ''; const s = n.slice(0, 3); const more = n.length - s.length; return (s.length === 1 ? s[0] : s.slice(0, -1).join(', ') + ' and ' + s[s.length - 1]) + (more > 0 ? ` and ${more} more` : ''); };
   return {
     lines(events, t) {
       const out = [];
       for (const e of events) {
         const N = e.id ? nameOf(e.id) : null;
+        const ph = { intro: 'other', gather: 'gather', wave: 'fight', boss: 'other', vote: 'other', end: 'other', clear: 'fight' }[e.k];
+        if (ph) phase = ph;
         switch (e.k) {
           case 'intro': ms = 0; break;
           case 'lore': out.push(L(LORE[e.i].say, 10, null, { win: 1, lore: e.i })); break;
@@ -74,6 +89,9 @@ export function makeSiegeLines({ nameOf, rng = Math.random, survivors = () => 1.
         const ids = joins.splice(0, 60);
         out.push(L(pick([`${list(ids)} join the defense.`, `Welcome to the wall, ${list(ids)}.`], rng), 2));
       }
+      if (out.length) lastSaid = t;
+      const tl = TIPS[phase], q = QUIET[phase];
+      if (tl && !out.length && t - lastSaid > q[0] && t - tipAt > q[1]) { tipAt = t; lastSaid = t; out.push(L(tl[tipN[phase]++ % tl.length], 2, null, { tip: 1 })); }
       return out;
     },
   };

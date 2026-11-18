@@ -1,96 +1,14 @@
-/* Dark Dimension Siege overrides on top of the shared overlay styles (br.css). 9:16 safe areas: the important HUD sits
-   between ~11% and ~64% of the height (TikTok's top bar, comments and buttons cover the rest). */
-body.siege, .siege #stage { background: #0a0514; }
-.siege #howto .title { background: linear-gradient(180deg, #e8c8ff, #9a4dff); border-color: #f4e8ff; color: #fff; text-shadow: 0 2px 0 rgba(40,0,80,0.6); box-shadow: 0 calc(var(--u) * 0.8) 0 #4a1a9a, 0 0 calc(var(--u) * 6) rgba(170,90,255,0.65); font-size: calc(var(--u) * 6.2); white-space: nowrap; }
-.siege #howto .title.join { background: linear-gradient(180deg, #ffe08a, #ff9a3c); color: #2a0f00; border-color: #fff0c8; text-shadow: none; box-shadow: 0 calc(var(--u) * 0.8) 0 #9a3a00, 0 0 calc(var(--u) * 6) rgba(255,150,60,0.55); }
-.siege #howto .title.vote { background: linear-gradient(180deg, #a8f0ff, #3a8aff); color: #fff; border-color: #e0faff; box-shadow: 0 calc(var(--u) * 0.8) 0 #003a9a, 0 0 calc(var(--u) * 6) rgba(80,170,255,0.7); animation: votePulse 1s ease-in-out infinite; }
-.siege #howto .title.fight { background: linear-gradient(180deg, #ff8a8a, #e0204a); color: #fff; border-color: #ffd0d0; box-shadow: 0 calc(var(--u) * 0.8) 0 #7a0020; }
-.siege #howto .chips span { font-size: calc(var(--u) * 2.7); white-space: nowrap; }
-.siege #howto .chips { flex-wrap: nowrap; justify-content: center; }
-#surv { position: absolute; top: 21.4%; left: 6%; right: 6%; text-align: center; pointer-events: none; }
-#surv .sl { font-weight: 900; font-size: calc(var(--u) * 2.6); letter-spacing: 0.12em; color: #cfe8ff; text-shadow: 0 2px 0 #000, 0 0 6px #000; }
-#surv .sn { font-weight: 900; font-style: italic; font-size: calc(var(--u) * 8.6); line-height: 1.02; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: #fff;
-  background: linear-gradient(180deg, #ffffff 15%, #bfe6ff 55%, #5ab0ff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 calc(var(--u) * 0.6) 0 rgba(0,20,60,0.95)) drop-shadow(0 0 calc(var(--u) * 3) rgba(80,170,255,0.75)); }
-#surv.mid .sn { background-image: linear-gradient(180deg, #fff 15%, #ffe08a 55%, #ff9a3c); filter: drop-shadow(0 calc(var(--u) * 0.6) 0 rgba(60,20,0,0.95)) drop-shadow(0 0 calc(var(--u) * 3) rgba(255,150,60,0.75)); }
-#surv.low .sn { background-image: linear-gradient(180deg, #fff 10%, #ff9a9a 50%, #ff2a4a); filter: drop-shadow(0 calc(var(--u) * 0.6) 0 rgba(60,0,10,0.95)) drop-shadow(0 0 calc(var(--u) * 4) rgba(255,40,70,0.9)); animation: lowBlink 1.2s infinite; }
-#surv.hit .sn { animation: svHit 0.45s ease-out; }
-#surv .sb { margin: calc(var(--u) * 0.6) auto 0; width: 70%; height: calc(var(--u) * 1); border-radius: 999px; background: rgba(0,0,0,0.55); overflow: hidden; }
-#surv .sb i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff2a4a, #ffd34d 40%, #5ab0ff); transition: width 0.3s; }
-#surv .drop { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); font-weight: 900; font-style: italic; font-size: calc(var(--u) * 4.4); color: #ff4a5a; -webkit-text-stroke: calc(var(--u) * 0.3) #2a0008; text-shadow: 0 0 calc(var(--u) * 3) rgba(255,40,60,0.9); animation: dropFloat 1.3s ease-out forwards; white-space: nowrap; }
-.siege #pill { top: 29.2%; background: linear-gradient(180deg, rgba(70,30,130,0.94), rgba(30,10,70,0.94)); border-color: rgba(200,160,255,0.7); box-shadow: 0 0 calc(var(--u) * 4) rgba(170,90,255,0.45); font-size: calc(var(--u) * 3.1); }
-.siege #pill.boss { background: linear-gradient(180deg, rgba(200,30,70,0.95), rgba(100,0,40,0.95)); border-color: #ffb0c0; }
-.siege #pill.end { background: linear-gradient(180deg, rgba(255,190,40,0.95), rgba(220,120,0,0.95)); color: #3a1800; border-color: #fff3b0; }
-#barrier { position: absolute; top: 33%; left: 50%; transform: translateX(-50%); width: 58%; pointer-events: none; text-align: center; }
-#barrier .bt { font-weight: 900; font-size: calc(var(--u) * 2.5); text-shadow: 0 2px 0 #000, 0 0 6px #000; white-space: nowrap; } #barrier .bt b { color: #8ad8ff; }
-#barrier .bar { margin-top: calc(var(--u) * 0.4); height: calc(var(--u) * 1.5); border-radius: 999px; background: rgba(0,0,0,0.55); border: calc(var(--u) * 0.3) solid rgba(140,210,255,0.6); overflow: hidden; }
-#barrier .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #3a6aff, #5ac8ff, #c8f4ff); box-shadow: 0 0 calc(var(--u) * 2) #5ac8ff; transition: width 0.3s; }
-#barrier.low .bar i { background: linear-gradient(90deg, #ff2a4a, #ff8a3a); }
-#barrier.low .bt b { color: #ff6a7a; animation: lowBlink 0.7s infinite; }
-#bossbar { position: absolute; top: 37%; left: 50%; transform: translateX(-50%); width: 76%; text-align: center; pointer-events: none; }
-#bossbar .bn { font-weight: 900; font-style: italic; font-size: calc(var(--u) * 3.4); color: #ffd0dc; text-shadow: 0 2px 0 #000, 0 0 calc(var(--u) * 3) #ff2a5a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#bossbar .bn b { color: #fff; font-size: calc(var(--u) * 2.8); }
-#bossbar .bar { margin-top: calc(var(--u) * 0.5); height: calc(var(--u) * 2.4); border-radius: 999px; background: rgba(0,0,0,0.6); border: calc(var(--u) * 0.35) solid #ffb0c0; overflow: hidden; transform: skewX(-12deg); }
-#bossbar .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff2a6a, #b03bff); transition: width 0.15s; }
-.siege #left, .siege #right { top: 37.6%; }
-.siege.bossing #left, .siege.bossing #right { top: 43%; }
-/* story vote */
-#vote { position: absolute; top: 37%; left: 5%; right: 5%; pointer-events: none; text-align: center; background: linear-gradient(180deg, rgba(20,8,50,0.92), rgba(50,14,90,0.9)); border: calc(var(--u) * 0.5) solid #9a7cff; border-radius: calc(var(--u) * 3); padding: calc(var(--u) * 1.6) calc(var(--u) * 2.2); box-shadow: 0 0 calc(var(--u) * 6) rgba(150,100,255,0.6); animation: popIn 0.4s cubic-bezier(.2,1.6,.4,1); z-index: 2; }
-#vote .vq { font-weight: 900; font-style: italic; font-size: calc(var(--u) * 4.4); letter-spacing: 0.03em; color: #ffd36a; text-shadow: 0 2px 0 #000; margin-bottom: calc(var(--u) * 1); }
-#vote .vo { position: relative; display: flex; align-items: center; gap: calc(var(--u) * 1.6); margin: calc(var(--u) * 1) 0; padding: calc(var(--u) * 1.1) calc(var(--u) * 1.8); border-radius: calc(var(--u) * 2); background: rgba(0,0,0,0.45); border: calc(var(--u) * 0.35) solid rgba(255,255,255,0.25); overflow: hidden; font-weight: 900; font-size: calc(var(--u) * 3.6); text-align: left; transition: transform 0.2s, opacity 0.3s; }
-#vote .vo .k { display: inline-grid; place-items: center; min-width: calc(var(--u) * 6); height: calc(var(--u) * 6); border-radius: 50%; background: #ffd36a; color: #2a0f00; font-size: calc(var(--u) * 4); z-index: 1; }
-#vote .vo .l { flex: 1; z-index: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #vote .vo b { z-index: 1; color: #ffd36a; }
-#vote .vo i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, rgba(120,80,255,0.55), rgba(90,200,255,0.4)); transition: width 0.3s; }
-#vote .vo.lead { border-color: #ffd36a; transform: scale(1.03); }
-#vote .vo.picked { border-color: #7dffa8; transform: scale(1.06); box-shadow: 0 0 calc(var(--u) * 4) rgba(120,255,170,0.7); }
-#vote .vo.lost { opacity: 0.4; }
-#vote .vt { font-weight: 800; font-size: calc(var(--u) * 2.8); color: #e0d0ff; margin-top: calc(var(--u) * 0.6); }
-.siege.voting #right, .siege.voting #feed, .siege.voting #barrier { display: none; }
-.siege.voting #left { top: 55%; width: 46%; }
-.siege.voting #toasts .t:nth-child(n+2) { display: none; }
-/* narrator */
-#say.narr { top: 61%; left: 5%; right: 5%; }
-#say.narr .txt { display: inline-block; background: linear-gradient(180deg, rgba(14,6,34,0.88), rgba(36,10,60,0.85)); border: calc(var(--u) * 0.35) solid rgba(200,150,255,0.6); border-left: calc(var(--u) * 1.2) solid #b070ff; border-radius: calc(var(--u) * 1.6); padding: calc(var(--u) * 1) calc(var(--u) * 2); font-size: calc(var(--u) * 3.3); line-height: 1.25; text-align: left; }
-#say.narr .who { display: block; font-size: calc(var(--u) * 2.3); color: #d7b4ff; font-weight: 900; letter-spacing: 0.08em; }
-/* anime cold-open */
-#lore { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 40%, rgba(40,6,60,0.25), rgba(4,0,10,0.82) 75%); z-index: 3; }
-#lore .lbar { position: absolute; left: 0; right: 0; height: 9%; background: #000; } #lore .lbar.top { top: 0; } #lore .lbar.bot { bottom: 0; height: 30%; background: linear-gradient(0deg, #000 70%, rgba(0,0,0,0)); }
-#lore .lart { position: absolute; top: 19.5%; left: 50%; width: 76%; aspect-ratio: 1 / 1; transform: translateX(-50%); border-radius: calc(var(--u) * 2); background: radial-gradient(circle at 50% 45%, #6a20b0, #1a0630 70%) center / cover no-repeat; border: calc(var(--u) * 0.5) solid rgba(220,180,255,0.8); box-shadow: 0 0 calc(var(--u) * 8) rgba(170,90,255,0.7), inset 0 0 calc(var(--u) * 10) rgba(0,0,0,0.6); display: grid; place-items: center; overflow: hidden; clip-path: polygon(4% 0, 100% 0, 96% 100%, 0 100%); }
-#lore .lart span { font-size: calc(var(--u) * 26); filter: drop-shadow(0 0 calc(var(--u) * 4) rgba(255,255,255,0.6)); opacity: 0.85; }
-#lore .lart[style*="url"] span { display: none; }
-#lore .lnum { position: absolute; top: 15.6%; left: 12%; font-weight: 900; font-size: calc(var(--u) * 2.6); letter-spacing: 0.3em; color: #c8a8ff; }
-#lore .ltitle { position: absolute; top: 49%; left: 4%; right: 4%; text-align: center; font-weight: 900; font-style: italic; font-size: calc(var(--u) * 7.6); line-height: 1.02; letter-spacing: 0.02em; color: #fff;
-  background: linear-gradient(180deg, #fff 20%, #e2c8ff 55%, #ff5a8a); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 calc(var(--u) * 0.6) 0 rgba(30,0,40,0.95)) drop-shadow(0 0 calc(var(--u) * 4) rgba(200,90,255,0.8)); }
-#lore .ltext { position: absolute; top: 56.6%; left: 7%; right: 7%; text-align: center; font-weight: 800; font-size: calc(var(--u) * 3.7); line-height: 1.3; color: #f0e6ff; text-shadow: 0 2px 0 #000, 0 0 8px #000; }
-#lore .ljoin { position: absolute; top: 66%; left: 0; right: 0; text-align: center; font-weight: 900; font-size: calc(var(--u) * 2.8); color: #ffd36a; text-shadow: 0 2px 0 #000; animation: lowBlink 1.6s infinite; }
+/* Dark Dimension Siege overrides on top of the shared overlay styles (br.css). Nearly nothing is written on screen:
+   tags, the ring, the survivors counter and the vote bars are drawn on the HUD canvas; the cold open is pure art + voice. */
+body.siege, .siege #stage { background: #0c0614; }
+/* the cold open: full-bleed anime art with a slow push-in (letterboxed), the narrator tells the story */
+#lore { position: absolute; inset: 0; pointer-events: none; background: #000; z-index: 3; overflow: hidden; }
+#lore .lart { position: absolute; top: 9%; left: 0; right: 0; height: 64%; background-size: cover; background-position: 50% 45%; }
+#lore .lbar { position: absolute; left: 0; right: 0; background: #000; z-index: 1; }
+#lore .lbar.top { top: 0; height: 9%; } #lore .lbar.bot { top: 73%; bottom: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 0, #000 6%); }
 #lore.play .lart { animation: loreArt var(--sec, 6s) ease-out forwards; }
-#lore.play .ltitle { animation: loreSlash 0.7s cubic-bezier(.2,1.4,.4,1) both; }
-#lore.play .ltext { animation: loreFade 0.9s 0.35s ease-out both; }
-.siege.cine #surv, .siege.cine #pill, .siege.cine #barrier, .siege.cine #left, .siege.cine #right, .siege.cine #say { display: none; }
-.siege.cine #howto { z-index: 4; top: 9.5%; }
-.siege.cine #howto .chips { display: none; }
-/* chapter title card */
-#chapter { position: absolute; top: 38%; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 2; }
-#chapter .c1 { display: inline-block; font-weight: 900; font-size: calc(var(--u) * 3.4); letter-spacing: 0.4em; color: #ffd36a; background: rgba(0,0,0,0.6); padding: calc(var(--u) * 0.6) calc(var(--u) * 3); transform: skewX(-14deg); }
-#chapter .c2 { font-weight: 900; font-style: italic; font-size: calc(var(--u) * 10); line-height: 1; margin-top: calc(var(--u) * 1); color: #fff; -webkit-text-stroke: calc(var(--u) * 0.4) #1a0430; text-shadow: 0 calc(var(--u) * 0.8) 0 #1a0430, 0 0 calc(var(--u) * 6) rgba(255,60,120,0.8); }
-#chapter .c3 { margin-top: calc(var(--u) * 1); font-weight: 900; font-size: calc(var(--u) * 3); color: #ff8aa8; text-shadow: 0 2px 0 #000; }
-#chapter.play .c1 { animation: loreSlash 0.5s both; } #chapter.play .c2 { animation: loreSlash 0.6s 0.12s both; } #chapter.play .c3 { animation: loreFade 0.6s 0.4s both; }
-/* ending */
-.siege #winner { top: 35%; }
-.siege #winner .w1 { font-style: italic; font-size: calc(var(--u) * 9); letter-spacing: 0.02em; }
-.siege #winner.fell .w1 { color: #ff5a6a; text-shadow: 0 calc(var(--u) * 0.6) 0 #3a0008, 0 0 calc(var(--u) * 6) rgba(255,40,60,0.9); }
-.siege #winner.saved .w1 { color: #ffe08a; }
-.siege #winner .ws { font-weight: 900; font-size: calc(var(--u) * 3.8); color: #cfe8ff; text-shadow: 0 2px 0 #000; margin-top: calc(var(--u) * 0.4); }
+@keyframes loreArt { 0% { opacity: 0; transform: scale(1.22) translateY(2%); filter: brightness(2); } 10% { opacity: 1; filter: brightness(1); } 90% { opacity: 1; } 100% { opacity: 0.85; transform: scale(1.04); } }
+.siege #winner { top: 33%; }
+.siege #winner .w1 { font-size: calc(var(--u) * 12); }
 .siege #winner .w2 { font-size: calc(var(--u) * 8); margin-top: calc(var(--u) * 1.6); }
-.siege #winner .wst { margin-top: calc(var(--u) * 1.2); font-weight: 800; font-size: calc(var(--u) * 2.8); color: #e0d0ff; text-shadow: 0 2px 0 #000; }
-.siege #banner { background: linear-gradient(180deg, #fff 10%, #e2c8ff 50%, #a050ff); -webkit-background-clip: text; background-clip: text; -webkit-text-stroke: calc(var(--u) * 0.45) #1a0430; filter: drop-shadow(0 calc(var(--u) * 0.8) 0 rgba(26,4,48,0.9)) drop-shadow(0 0 calc(var(--u) * 4) rgba(170,90,255,0.8)); font-size: calc(var(--u) * 10); top: 43%; }
-.siege #toasts .t.volley { background: linear-gradient(90deg, #ff6ad5, #b03bff); } .siege #toasts .t.rune { background: linear-gradient(90deg, #1fb6ff, #3a6aff); } .siege #toasts .t.guardian { background: linear-gradient(90deg, #ffb020, #d08a00); } .siege #toasts .t.awaken { background: linear-gradient(90deg, #ffe14a, #ff8a00); color: #2a1000; } .siege #toasts .t.dragon { background: linear-gradient(90deg, #ff3a2a, #ff9a2a); } .siege #toasts .t.perk { background: linear-gradient(90deg, #2ee67a, #1aa0ff); }
-.siege #feed .k.cls { border-left-color: #b07cff; } .siege #feed .k.win { border-left-color: #ffe14a; }
-.siege #count { color: #e8f4ff; text-shadow: 0 calc(var(--u)) 0 #2a3aa0, 0 0 calc(var(--u) * 8) rgba(90,170,255,0.8); top: 44%; }
-@keyframes votePulse { 50% { transform: scale(1.05); } }
-@keyframes lowBlink { 50% { opacity: 0.55; } }
-@keyframes svHit { 0% { transform: scale(1.12) translateX(-2%); } 30% { transform: scale(1.05) translateX(2%); } 100% { transform: none; } }
-@keyframes dropFloat { 0% { opacity: 0; transform: translate(-50%, 0) scale(1.6); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, 140%); } }
-@keyframes loreArt { 0% { opacity: 0; transform: translateX(-50%) scale(1.18); filter: brightness(2); } 12% { opacity: 1; filter: brightness(1); } 100% { transform: translateX(-50%) scale(1.0); } }
-@keyframes loreSlash { 0% { opacity: 0; transform: translateX(-30%) skewX(-30deg); letter-spacing: 0.3em; } 60% { opacity: 1; transform: translateX(2%) skewX(-8deg); } 100% { transform: none; } }
-@keyframes loreFade { 0% { opacity: 0; transform: translateY(20%); } 100% { opacity: 1; transform: none; } }
+.siege #vignette { transition: background 1s; }

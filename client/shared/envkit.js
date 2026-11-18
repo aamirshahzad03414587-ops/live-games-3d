@@ -46,7 +46,7 @@ export async function loadEnv(url) {
       const g = geos.get(name); if (!g || !items.length) return null;
       const im = new InstancedMesh(g, material, items.length); const o = new Object3D();
       let maxR = 0;
-      items.forEach((it, i) => { o.position.set(it.x, it.y || 0, it.z); o.rotation.set(0, it.ry || 0, 0); o.scale.setScalar(it.s || 1); o.updateMatrix(); im.setMatrixAt(i, o.matrix); maxR = Math.max(maxR, Math.hypot(it.x, it.z) + (it.s || 1) * 3); });
+      items.forEach((it, i) => { o.position.set(it.x, it.y || 0, it.z); o.rotation.set(it.rx || 0, it.ry || 0, it.rz || 0); o.scale.set((it.s || 1) * (it.sx || 1), (it.s || 1) * (it.sy || 1), (it.s || 1) * (it.sz || 1)); o.updateMatrix(); im.setMatrixAt(i, o.matrix); maxR = Math.max(maxR, Math.hypot(it.x, it.z) + (it.s || 1) * 3); });
       im.instanceMatrix.needsUpdate = true;
       im.geometry.boundingSphere; im.boundingSphere = new Sphere(new Vector3(), maxR); im.frustumCulled = false;
       return im;

@@ -6,7 +6,7 @@
 // - Lambert materials (cheap on mobile GPUs) + per-actor "flash" for hits, nothing allocated per frame
 import {
   Group, SkinnedMesh, Skeleton, Matrix4, MeshLambertMaterial, MeshBasicMaterial, Color, AnimationMixer, LoopOnce, LoopRepeat,
-  BufferAttribute, Sphere, Vector3, SRGBColorSpace, AdditiveBlending,
+  BufferAttribute, BufferGeometry, Sphere, Vector3, SRGBColorSpace, AdditiveBlending,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
@@ -152,6 +152,31 @@ export async function loadKit({ base = '/models', names = [], onProgress } = {})
     if (a.tint !== tint) { a.mesh.material = kit.material(name, tint); a.tint = tint; }
     a.obj.visible = true; a.state = ''; a.base = 'idle'; a.until = 0; a.mixer.stopAllAction(); a.play('idle', 0, { fade: 0 });
     return a;
+  };
+  /** flip-book poses for crowds: bake `frames` evenly spaced poses of a clip into static geometries (model space,
+   *  shared index/uv). Drawn as one InstancedMesh per pose, so 100+ creatures cost a handful of draw calls. */
+  kit.bake = (name, state, frames = 4, { from = 0, to = 1 } = {}) => {
+    const key = `${name}|${state}|${frames}|${from}|${to}`;
+    kit.baked = kit.baked || new Map();
+    if (kit.baked.has(key)) return kit.baked.get(key);
+    const a = kit.actor(name); const act = action(kit, a, state);
+    a.mixer.stopAllAction(); act.reset(); act.setLoop(LoopRepeat, Infinity); act.play();
+    const dur = act.getClip().duration, src = a.mesh.geometry, n = src.attributes.position.count, v = new Vector3();
+    const out = [];
+    for (let f = 0; f < frames; f++) {
+      a.mixer.setTime(dur * (from + (to - from) * (f / frames)));
+      a.obj.updateMatrixWorld(true); a.mesh.skeleton.update();
+      const pos = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { a.mesh.getVertexPosition(i, v); v.applyMatrix4(a.mesh.matrix); pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z; }
+      const g = new BufferGeometry(); g.setAttribute('position', new BufferAttribute(pos, 3)); g.setAttribute('uv', src.attributes.uv);
+      if (src.index) g.setIndex(src.index);
+      for (const gr of src.groups) g.addGroup(gr.start, gr.count, gr.materialIndex);
+      g.computeVertexNormals(); g.boundingSphere = new Sphere(new Vector3(0, 1, 0), 2.2);
+      kit.disposables.push(g); out.push(g);
+    }
+    act.stop(); kit.release(a);
+    kit.baked.set(key, out);
+    return out;
   };
   kit.release = (a) => { a.obj.visible = false; a.obj.parent?.remove(a.obj); a.mixer.stopAllAction(); (kit.pools.get(a.name) || []).push(a); };
   kit.dispose = () => { for (const d of kit.disposables) try { d.dispose(); } catch {} kit.pools.clear(); kit.variants.clear(); };

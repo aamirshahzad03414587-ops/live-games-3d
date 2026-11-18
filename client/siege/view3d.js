@@ -1,6 +1,8 @@
 // Dark Dimension Siege, 3D view (Three.js), iPhone Safari first:
 // - one static night scene: a ruined low-poly city, the last citadel wall, and the rift (a cheap swirl shader)
-// - instanced chibi defenders with class props, instanced creatures (imp / brute / wraith), three hand-built bosses
+// - rigged, animated CC0 KayKit defenders (pooled actors, shared clips), skeleton hordes drawn as baked flip-book poses
+//   (one InstancedMesh per pose: 100+ creatures in ~30 draw calls), KayKit bosses + golden knights, KayKit City / Halloween /
+//   Dungeon / Hexagon props for the ruined city, the wall and the citadel (procedural fallback until they stream in)
 // - glow halos + additive particles for every spell; camera shakes; no real-time shadows, no post-processing
 import {
   WebGLRenderer, Scene, PerspectiveCamera, Color, Fog, HemisphereLight, DirectionalLight, PointLight, AmbientLight,
@@ -11,6 +13,12 @@ import {
 } from 'three';
 import { WALL_Z, WALL_Y, GATE_Z, RIFT_Z, CLASSES } from '../../public/shared/siege-data.js';
 import { SFLAG } from '../../public/shared/siege-sim.js';
+import { loadKit, tickActor } from '../shared/kaykit.js';
+import { loadEnv } from '../shared/envkit.js';
+
+const DEF_MODEL = ['Mage', 'Barbarian', 'Rogue', 'Knight'];   // mage, warrior, archer, healer (paladin)
+const DEF_ATK = ['cast', 'slash', 'shoot', 'summon'];
+const DSC = 0.74;
 
 const TAU = Math.PI * 2;
 const SKIN = [0xffd9b8, 0xf1c08f, 0xd9a066, 0xa86b45, 0x7a4a2c, 0xffe3cf];
@@ -38,6 +46,16 @@ export function createSiegeView(canvas, opts = {}) {
   const amb = new AmbientLight(0x6a4a8a, 0.35); scene.add(amb);
   const moon = new DirectionalLight(0xb8c4ff, 0.9); moon.position.set(-20, 30, 10); scene.add(moon);
   const riftLight = new PointLight(0xb040ff, 60, 60, 1.4); riftLight.position.set(0, 6, RIFT_Z + 4); scene.add(riftLight);
+
+  // ------------------------------------------------------------------ CC0 KayKit models (stream in, then replace the procedural stand-ins)
+  let kit = null, env = null, disposed = false, loadErr = null;
+  const ready = Promise.all([loadEnv(opts.envUrl || '/models/env-siege.glb'), loadKit({ names: ['Mage', 'Barbarian', 'Rogue', 'Knight', 'Rogue_Hooded', 'Skeleton_Minion', 'Skeleton_Warrior', 'Skeleton_Mage'] })])
+    .then(([e, k]) => {
+      if (disposed) { e.dispose(); k.dispose(); return; }
+      env = e; kit = k;
+      upgradeModels();
+    }).catch((err) => { loadErr = err; throw err; });
+  ready.catch(() => {});
   const wallLight = new PointLight(0xffa050, 14, 22, 1.6); wallLight.position.set(0, 5, 2); scene.add(wallLight);
   const ramp = keep(new DataTexture(new Uint8Array([70, 160, 255]), 3, 1, RedFormat)); ramp.minFilter = ramp.magFilter = NearestFilter; ramp.needsUpdate = true;
   const toon = (color, extra = {}) => keep(new MeshToonMaterial({ color, gradientMap: ramp, ...extra }));
@@ -399,6 +417,146 @@ export function createSiegeView(canvas, opts = {}) {
   const setP = (im, i, lx, ly, lz, sx, sy, sz, rx = 0, rz = 0, col = null, ry = 0) => { L2.compose(V.set(lx, ly, lz), Q.setFromEuler(E.set(rx, ry, rz)), S.set(sx, sy, sz)); M.multiplyMatrices(ROOT, L2); im.setMatrixAt(i, M); if (col) im.setColorAt(i, col); };
   const defY = (m) => (m.z < WALL_FRONT - 0.1 ? 0 : WALL_Y + 0.08);
 
+  // ------------------------------------------------------------------ KayKit upgrade: actors, flip-book hordes, props
+  const FB = [];          // per creature kind: { run: [InstancedMesh], atk: [InstancedMesh], s }
+  const envMeshes = [];
+  const lanterns = [];    // glow points of the KayKit lamp posts
+  let frameNo = 0;
+  function upgradeModels() {
+    // creatures: baked poses of the shared clips (skeleton minions, warriors, spectral mages)
+    const book = (name, tint, state, frames, o) => kit.bake(name, state, frames, o).map((g) => {
+      const im = new InstancedMesh(g, kit.material(name, tint), ECAP); im.frustumCulled = false; im.count = 0;
+      for (let i = 0; i < ECAP; i++) im.setColorAt(i, white); scene.add(im); return im;
+    });
+    FB[0] = { run: book('Skeleton_Minion', null, 'run', 4), atk: book('Skeleton_Minion', null, 'attack', 3, { to: 0.8 }), s: 0.78 };
+    FB[1] = { run: book('Skeleton_Warrior', null, 'run', 4), atk: book('Skeleton_Warrior', null, 'slash', 3, { to: 0.8 }), s: 1.35 };
+    FB[2] = { run: book('Skeleton_Mage', 'ghost', 'idle', 2), atk: book('Skeleton_Mage', 'ghost', 'cast', 2, { to: 0.6 }), s: 1.05 };
+    // bosses: giant KayKit figures keep their procedural magic (book, stone, wings, orb, souls, cape)
+    const BM = { scientist: ['Mage', 0x9a70c0, 2.25], scientist2: ['Mage', 0x6a1030, 2.15], mastermind: ['Rogue_Hooded', 0x401020, 2.9] };
+    for (const [id, b] of Object.entries(BOSS)) {
+      const [model, tint, sc] = BM[id];
+      const extras = new Set([b.P.book, b.P.stone, b.P.core, b.P.orb, b.P.cape, ...(b.P.wings || []), ...(b.P.souls || [])].filter(Boolean));
+      for (const c of b.g.children) if (!extras.has(c)) c.visible = false;
+      const a = kit.actor(model, null); a.mesh.material = (Array.isArray(a.mesh.material) ? a.mesh.material : [a.mesh.material]).map((m) => { const c = m.clone(); if (c.color) c.color.lerp(new Color(tint), 0.5); keep(c); return c; });
+      if (a.mesh.material.length === 1) a.mesh.material = a.mesh.material[0];
+      b.amat = Array.isArray(a.mesh.material) ? a.mesh.material[0] : a.mesh.material;
+      a.obj.scale.setScalar(sc); b.g.add(a.obj); b.actor = a; a.play('combat', 0);
+    }
+    // golden knights (the Guardian gift)
+    for (const g of GUARD) { for (const c of g.g.children) c.visible = false; g.actor = kit.actor('Knight', 0xffd25a); g.actor.obj.scale.setScalar(1.05); g.g.add(g.actor.obj); }
+    dressScene();
+  }
+  function dressScene() {
+    // night grade for the daylight KayKit atlases (the rift and torches light the scene)
+    for (const m of new Set([...env.geos.keys()].map((n) => env.matOf(n)))) if (m && m.color) m.color.setHex(0x8f86b8);
+    const add = (name, items) => { const m = env.instanced(name, items); if (m) { scene.add(m); envMeshes.push(m); } };
+    const withParts = (name, subs, items) => { add(name, items); for (const sname of subs) add(sname, items); };
+    let sd = 23; const r = () => { sd = (sd * 16807) % 2147483647; return (sd - 1) / 2147483646; };
+    // the ruined city: KayKit City Builder blocks, some leaning, under the rift's light
+    bld.visible = roofs.visible = rubble.visible = false;
+    const B = 'ABCDEFGH'.split('').map((c) => 'building_' + c), city = {};
+    for (const side of [-1, 1]) for (let i = 0; i < 24; i++) {
+      const row = i % 3, z = -50 + Math.floor(i / 3) * 6.4 + r() * 2, x = side * (11.5 + row * 5.6 + r() * 2);
+      const name = B[(r() * B.length) | 0], broken = r() < 0.3;
+      (city[name] || (city[name] = [])).push({ x, z, ry: Math.floor(r() * 4) * Math.PI / 2, s: 2.4 + r() * 0.5, sy: row ? 1.1 + r() * 1.2 : 1 + r() * 0.5, rx: broken ? (r() - 0.5) * 0.16 : 0, rz: broken ? (r() - 0.5) * 0.2 : 0 });
+    }
+    for (const [n, it] of Object.entries(city)) add(n, it);
+    const W4 = ['wheel_front_left', 'wheel_front_right', 'wheel_rear_left', 'wheel_rear_right'];
+    const cars = { car_sedan: [{ x: -8.8, z: -14, ry: 0.5, s: 4.2, rz: 0.12 }, { x: 9.2, z: -25, ry: 2.6, s: 4.2 }], car_police: [{ x: 9.0, z: -8, ry: -0.4, s: 4.2 }], car_taxi: [{ x: -9.4, z: -27, ry: 2.2, s: 4.2, rz: -0.2 }] };
+    for (const [n, it] of Object.entries(cars)) withParts(n, W4.map((wn) => `${n}_${wn}`), it);
+    const trees = [], graves = [], stones = [], fences = [], posts = [], lights = [], rub = [];
+    for (let i = 0; i < 10; i++) { const side = i % 2 ? 1 : -1; trees.push({ x: side * (9.2 + r() * 4), z: -44 + i * 4.4 + r() * 2, ry: r() * 6, s: 1.1 + r() * 0.5 }); }
+    for (let i = 0; i < 8; i++) { const side = i % 2 ? 1 : -1; (i % 3 ? stones : graves).push({ x: side * (8.3 + r() * 1.6), z: -30 + i * 3.4, ry: (r() - 0.5) * 0.6, s: 0.8 + r() * 0.3, rz: (r() - 0.5) * 0.2 }); }
+    for (let i = 0; i < 6; i++) { const side = i % 2 ? 1 : -1; fences.push({ x: side * 8.0, z: -36 + Math.floor(i / 2) * 11 + r() * 3, ry: Math.PI / 2, s: 0.9 }); }
+    for (let i = 0; i < 4; i++) { const side = i % 2 ? 1 : -1, z = -22 + Math.floor(i / 2) * 12; posts.push({ x: side * 7.9, z, ry: side > 0 ? -Math.PI / 2 : Math.PI / 2, s: 1 }); lanterns.push([side * 7.9 - side * 1.0, 2.5, z]); }
+    for (let i = 0; i < 4; i++) { const side = i % 2 ? 1 : -1; lights.push({ x: side * 8.6, z: -40 + i * 10, ry: side > 0 ? 0 : Math.PI, s: 4.5 }); }
+    for (let i = 0; i < 6; i++) { const side = i % 2 ? 1 : -1; rub.push({ x: side * (13 + r() * 6), z: -46 + i * 7, ry: r() * 6, s: 0.6 + r() * 0.4 }); }
+    add('tree_dead_large', trees.filter((_, i) => i % 3 === 0)); add('tree_dead_medium', trees.filter((_, i) => i % 3 === 1)); add('tree_dead_small', trees.filter((_, i) => i % 3 === 2));
+    add('grave_A', graves); add('gravestone', stones.filter((_, i) => i % 2)); add('gravemarker_A', stones.filter((_, i) => !(i % 2)));
+    add('fence_broken', fences); withParts('post_lantern', ['post_lantern_lantern'], posts); add('streetlight', lights); add('rubble_large', rub);
+    add('crypt', [{ x: -15, z: -31, ry: 0.5, s: 1.1 }]); add('pumpkin_orange_jackolantern', [{ x: 8.6, z: -4, ry: -0.6, s: 0.8 }, { x: -8.4, z: -18, ry: 0.4, s: 0.7 }]);
+    add('skull', [{ x: -7.6, z: -9, ry: 0.7, s: 0.6 }]); add('ribcage', [{ x: 7.2, z: -16, ry: 1.2, s: 1.4 }]);
+    // the wall: KayKit dungeon stone in front of the walkway, a doorway at the gate, catapult towers at the ends
+    const zW = WALL_FRONT + 0.45, sy = WALL_Y / 4;
+    add('wall', [-8, -4, 4, 8].map((x) => ({ x, z: zW, sy })).concat([{ x: -12, z: zW, sy }, { x: 12, z: zW, sy }]));
+    add('wall_doorway', [{ x: 0, z: zW, sy }]); gateArch.visible = false;
+    for (const t of towers) { for (const c of t.t.children) if (c !== t.flag) c.visible = false; t.flag.position.y = 8.4; }
+    withParts('building_tower_catapult_red', ['catapult_turret_red', 'catapult_arm_red'], [-1, 1].map((sx) => ({ x: sx * 11.6, z: (WALL_FRONT + WALL_BACK) / 2, ry: sx > 0 ? -0.4 : 0.4, s: 3.6 })));
+    torchM.visible = false; add('torch_lit', TORCH.map((x) => ({ x, y: WALL_Y + 0.6, z: WALL_FRONT + 0.15, s: 1.3 })));
+    add('barrel_large', [{ x: -5.2, z: WALL_BACK + 1.4, s: 0.5 }]); add('crates_stacked', [{ x: 5.6, z: WALL_BACK + 1.5, ry: 0.4, s: 0.6 }]);
+    // the citadel the survivors hide in
+    keepG.visible = false;
+    add('building_castle_red', [{ x: 0, z: 31, s: 4.4 }]);
+    withParts('building_tower_A_red', ['building_tower_A_top_red'], [{ x: -8.5, z: 30, s: 4 }, { x: 8.5, z: 30, s: 4 }]);
+  }
+  const DY = new Vector3();
+  function kitDefenders(list, now, dt, halos) {
+    let n = 0; frameNo++;
+    const lod = quality.animLod || 1, crowd = list.length > 28;
+    for (const m of list) {
+      let s = vis.get(m.id);
+      if (!s) { s = { spawn: now, x: m.x, z: m.z, y: defY(m), atk: -9, speed: 0, acc: 0 }; vis.set(m.id, s); }
+      s.seen = now; s.frame = frameNo;
+      const sp = Math.hypot(m.x - s.x, m.z - s.z) / Math.max(dt, 1e-3);
+      s.speed += (Math.min(sp, 10) - s.speed) * Math.min(1, dt * 8);
+      s.x = m.x; s.z = m.z;
+      const down = m.flags & SFLAG.down, asc = m.flags & SFLAG.asc;
+      const y0 = defY(m); s.y = y0;
+      const model = DEF_MODEL[m.cls] || 'Knight', info = m.info || {};
+      if (!s.a || s.model !== model) { if (s.a) kit.release(s.a); s.model = model; s.a = kit.actor(model, m.flags & 1 ? null : (info.color ?? null)); scene.add(s.a.obj); }
+      const a = s.a, pa = Math.min(1, (now - s.spawn) / 0.35);
+      a.obj.position.set(m.x, y0 + (asc ? 0.25 + Math.sin(now * 3) * 0.08 : 0), m.z);
+      a.obj.rotation.set(0, Math.PI + (m.cls === 1 ? 0 : Math.sin(now * 0.7 + m.id) * 0.15), 0);
+      a.obj.scale.setScalar(DSC * (0.4 + 0.6 * pa) * (asc ? 1.18 : 1));
+      const base = down ? 'dead' : s.speed > 2.4 ? 'run' : s.speed > 0.4 ? 'walk' : m.flags & SFLAG.cmd || asc ? 'cheer' : 'combat';
+      if (down && a.base !== 'dead') a.play('die', now);
+      a.play(base, now);
+      if (!down && now - s.atk < 0.05 && now >= a.until) a.play(DEF_ATK[m.cls] || 'slash', now, { speed: 1.5 });
+      s.acc += dt;
+      const every = (crowd ? 2 : 1) * lod;
+      if ((frameNo + m.id) % every === 0) { tickActor(kit, a, s.acc, now); s.acc = 0; }
+      L2.compose(V.set(m.x, y0 + 0.03, m.z), Q.identity(), S.set(1.1, 1, 1.1)); P.shadow.setMatrixAt(n, L2);
+      const cc = cB.setHex(CLS_COL[m.cls] ?? 0xffffff);
+      if (asc) { halos.push([m.x, y0 + 0.8, m.z, 1, 0.85, 0.3, 0.9 + 0.3 * Math.sin(now * 8), 3.2]); if (Math.random() < dt * 8 * partMult) emit(glow, 1, m.x, y0 + 0.4, m.z, { color: 0xffd34d, up: 1, speed: 1.4, g: -3, life: 0.6, size: 0.25, jitter: 0.6 }); }
+      else if ((m.cls === 0 || m.cls === 3) && (n < 24 || now - s.atk < 0.3) && a.hand) { a.hand.getWorldPosition(DY); halos.push([DY.x, DY.y + 0.5, DY.z, cc.r, cc.g, cc.b, 0.5 + (now - s.atk < 0.3 ? 0.8 : 0), 0.9]); }
+      if (m.flags & SFLAG.gift) halos.push([m.x, y0 + 0.9, m.z, 1, 0.5, 0.9, 0.9, 2.6]);
+      drawn.push({ id: m.id, x: m.x, y: y0 + 2.0 * DSC * pa + 0.15, z: m.z, info, flags: m.flags, cls: m.cls, hp: m.hp });
+      n++;
+    }
+    for (const s of vis.values()) if (s.a && s.frame !== frameNo) { kit.release(s.a); s.a = null; }
+    return n;
+  }
+  function kitEnemies(w, now, dt, halos, ec) {
+    let bossE = null;
+    for (const f of FB) for (const set of [f.run, f.atk]) for (const im of set) im.count = 0;
+    for (const e of w.enemies) {
+      if (e.k === 3) { bossE = e; continue; }
+      const fb = FB[e.k]; if (!fb) continue;
+      let s = evis.get(e.id);
+      if (!s) { s = { born: now, hit: -9, ph: Math.random() * 8, px: e.x, pz: e.z, mv: 1, yaw: 0 }; evis.set(e.id, s); }
+      s.seen = now;
+      const dx = e.x - s.px, dz = e.z - s.pz, sp = Math.hypot(dx, dz) / Math.max(dt, 1e-3);
+      s.px = e.x; s.pz = e.z; s.mv += ((sp > 0.3 ? 1 : 0) - s.mv) * Math.min(1, dt * 6);
+      if (sp > 0.3) { const want = Math.atan2(dx, dz); let d = want - s.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); s.yaw += d * Math.min(1, dt * 8); }
+      const attacking = s.mv < 0.5, set = attacking ? fb.atk : fb.run;
+      const rate = attacking ? 4 : e.k === 0 ? 9 : e.k === 1 ? 5.5 : 2;
+      const im = set[Math.floor(now * rate + s.ph) % set.length];
+      const i = im.count++;
+      const hitK = Math.max(0, 1 - (now - s.hit) / 0.18);
+      const pa = Math.min(1, (now - s.born) / 0.5), sc = fb.s * (0.2 + 0.8 * pa);
+      const fy = e.k === 2 ? 2.4 + Math.sin(now * 2 + s.ph) * 0.4 : 0;
+      ROOT.compose(V.set(e.x, fy, e.z), Q.setFromEuler(E.set(e.k === 2 ? 0.2 : 0, s.yaw, e.k === 2 ? Math.sin(now * 1.7 + s.ph) * 0.12 : 0)), S.set(sc, sc, sc));
+      im.setMatrixAt(i, ROOT);
+      im.setColorAt(i, hitK > 0 ? cA.setRGB(1 + hitK * 1.6, 1 + hitK * 0.5, 1 + hitK * 0.5) : white);
+      if (e.k !== 2) { L2.compose(V.set(e.x, 0.03, e.z), Q.identity(), S.set(e.k === 1 ? 2.0 : 1.1, 1, e.k === 1 ? 2.0 : 1.1)); EN.eShadow.setMatrixAt(ec.sh++, L2); }
+      else if (Math.random() < dt * 4 * partMult) emit(glow, 1, e.x, fy + 0.3, e.z, { color: 0x9a5aff, up: -0.2, speed: 0.6, g: 1, life: 0.6, size: 0.35 });
+      const top = e.k === 1 ? 2.6 : e.k === 2 ? fy + 2.0 : 1.5;
+      epos.set(e.id, { x: e.x, y: e.k === 2 ? fy + 1.2 : top * 0.6, z: e.z, k: e.k });
+      if (e.k === 1 || i < 30) halos.push([e.x, top * 0.82, e.z + 0.3, e.k === 2 ? 0.5 : 0.4, e.k === 2 ? 0.8 : 0.9, 1, 0.35, e.k === 1 ? 0.9 : 0.5]);
+    }
+    for (const f of FB) for (const set of [f.run, f.atk]) for (const im of set) { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
+    return bossE;
+  }
   function frame(w, dt, now) {
     time = now;
     const ending = w.phase === 'ending' && endState;
@@ -436,14 +594,14 @@ export function createSiegeView(canvas, opts = {}) {
       const e = k * k * (3 - 2 * k);
       tgtPos.set(Math.sin(e * 1.4 - 0.7) * 10, 6 + e * 6, -6 + e * 24); tgtLook.set(0, RIFT_Y - e * 5, RIFT_Z + e * 22);
     } else if (w.phase === 'gather' || w.phase === 'chapter') {
-      tgtPos.set(Math.sin(now * 0.12) * 2.5, 12.5, 18.5); tgtLook.set(0, 0.8, -3);
+      tgtPos.set(Math.sin(now * 0.12) * 3, 10.5, 16); tgtLook.set(0, 1.8, -8);
     } else if (w.phase === 'boss' && w.bo) {
-      tgtPos.set(Math.sin(now * 0.2) * 1.5, 14.5, 20); tgtLook.set(bossVis.x * 0.3, 0.8, Math.max(-10, bossVis.z * 0.35 - 3));
+      tgtPos.set(Math.sin(now * 0.2) * 2, 12, 18); tgtLook.set(bossVis.x * 0.3, 2.2, Math.max(-14, bossVis.z * 0.45 - 4));
     } else if (w.phase === 'vote' || w.phase === 'choice') {
-      tgtPos.set(Math.sin(now * 0.25) * 3, 11, 17); tgtLook.set(0, 3.5, -14);
+      tgtPos.set(Math.sin(now * 0.25) * 3, 9.5, 15); tgtLook.set(0, 4.5, -16);
     } else if (w.phase === 'ending') {
       const a = now * 0.12; tgtPos.set(Math.sin(a) * 14, 9 + dawn * 3, 10 + Math.cos(a) * 8); tgtLook.set(0, 3 + dawn * 2, -6);
-    } else { tgtPos.set(Math.sin(now * 0.15) * 1.2, 14, 19.5); tgtLook.set(0, 0.3, -4); }
+    } else { tgtPos.set(Math.sin(now * 0.15) * 1.8, 12.5, 17.5); tgtLook.set(0, 0.8, -9); }
     const ck = Math.min(1, dt * (w.phase === 'intro' ? 1.6 : 1.8));
     if (camPos.distanceTo(tgtPos) > 45) { camPos.copy(tgtPos); camLook.copy(tgtLook); }
     camPos.lerp(tgtPos, ck); camLook.lerp(tgtLook, ck);
@@ -454,6 +612,7 @@ export function createSiegeView(canvas, opts = {}) {
 
     const halos = [];
     TORCH.forEach((x, i) => { const fl = 0.75 + 0.25 * Math.sin(now * (9 + i) + i * 2); halos.push([x, WALL_Y + 1.35, WALL_FRONT + 0.15, 1, 0.55 * fl, 0.18 * fl, 0.9 * fl, 2.2]); halos.push([x, WALL_Y + 1.3, WALL_FRONT + 0.15, 1, 0.9, 0.6, 1, 0.5]); if (Math.random() < dt * 3 * partMult) emit(glow, 1, x, WALL_Y + 1.4, WALL_FRONT + 0.15, { color: 0xffa040, up: 1, speed: 0.8, g: -2, life: 0.7, size: 0.18 }); });
+    for (const l of lanterns) halos.push([l[0], l[1], l[2], 1, 0.7, 0.35, 0.8 + 0.15 * Math.sin(now * 7 + l[2]), 2.4]);
     gateRune.material.opacity = 0.45 + 0.3 * Math.sin(now * 2) + bar * 0.3;
     halos.push([0, RIFT_Y, RIFT_Z, 0.7, 0.25, 1, 0.5 * riftPow, 20]);
     if (Math.random() < dt * 8 * partMult && rs > 0.1) { const a = Math.random() * TAU; emit(glow, 1, Math.cos(a) * 5.6 * rs, RIFT_Y + Math.sin(a) * 7 * rs, RIFT_Z, { colors: [0xc060ff, 0xff3a6a], up: 0.2, speed: 1.5, g: -0.5, life: 1.4, size: 0.5 }); }
@@ -465,7 +624,8 @@ export function createSiegeView(canvas, opts = {}) {
     let list = w.members;
     if (list.length > cap) { list = capList; list.length = 0; for (const m of w.members) if (!(m.flags & 1) && list.length < cap) list.push(m); for (const m of w.members) if ((m.flags & 1) && list.length < cap) list.push(m); }
     let n = 0, hatN = 0, staffN = 0, swordN = 0, bowN = 0, haloN = 0;
-    for (const m of list) {
+    if (kit) n = kitDefenders(list, now, dt, halos);
+    else for (const m of list) {
       let s = vis.get(m.id);
       if (!s) { s = { walk: Math.random() * 10, spawn: now, skin: SKIN[m.id % SKIN.length], x: m.x, z: m.z, y: defY(m), atk: -9 }; vis.set(m.id, s); }
       s.seen = now;
@@ -508,14 +668,16 @@ export function createSiegeView(canvas, opts = {}) {
       n++;
     }
     const cnt = { eyes: n * 2, hands: n * 2, feet: n * 2, staff: staffN, orb: staffN, hat: hatN, sword: swordN, shield: swordN, bow: bowN, halo: haloN };
+    if (kit) for (const key of Object.keys(P)) cnt[key] = key === 'shadow' ? n : 0;
     for (const key of Object.keys(P)) { const im = P[key]; im.count = cnt[key] ?? n; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
-    if (vis.size > list.length + 40) for (const [id, s] of vis) if (now - s.seen > 5) vis.delete(id);
+    if (vis.size > list.length + 40) for (const [id, s] of vis) if (now - s.seen > 5) { if (s.a) kit.release(s.a); vis.delete(id); }
 
     // ---------------- creatures
     epos.clear();
     const ec = { imp: 0, bru: 0, wr: 0, sh: 0 };
     let bossE = null;
-    for (const e of w.enemies) {
+    if (kit) bossE = kitEnemies(w, now, dt, halos, ec);
+    else for (const e of w.enemies) {
       if (e.k === 3) { bossE = e; continue; }
       let s = evis.get(e.id);
       if (!s) { s = { born: now, hit: -9, ph: Math.random() * TAU }; evis.set(e.id, s); }
@@ -554,6 +716,7 @@ export function createSiegeView(canvas, opts = {}) {
       if (e.k === 1 || ec.imp < 40) halos.push([e.x, e.k === 1 ? 1.55 : e.k === 2 ? 3.8 : 0.66, e.z + (e.k === 1 ? 0.75 : 0.38), e.k === 2 ? 0.5 : 1, e.k === 1 ? 0.3 : e.k === 2 ? 0.9 : 0.85, e.k === 2 ? 1 : 0.2, 0.5, e.k === 1 ? 0.9 : 0.5]);
     }
     const ecount = { impBody: ec.imp, impHorn: ec.imp * 2, impEye: ec.imp * 2, impWing: ec.imp * 2, bruBody: ec.bru, bruArm: ec.bru * 2, bruHorn: ec.bru * 2, bruEye: ec.bru * 2, wrBody: ec.wr, wrHood: ec.wr, wrEye: ec.wr * 2, eShadow: ec.sh };
+    if (kit) for (const key of Object.keys(ecount)) ecount[key] = key === 'eShadow' ? ec.sh : 0;
     for (const key of Object.keys(EN)) { const im = EN[key]; im.count = ecount[key]; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
     if (evis.size > 200) for (const [id, s] of evis) if (now - s.seen > 3) evis.delete(id);
 
@@ -573,6 +736,13 @@ export function createSiegeView(canvas, opts = {}) {
       b.g.scale.setScalar(base * (1 + atk * 0.08) * (1 - dk * 0.5));
       const hitK = Math.max(0, 1 - (now - bossVis.hitT) / 0.15);
       for (const [mat, em] of b.mats) mat.emissive.copy(em).lerp(white, hitK * 0.6);
+      if (b.actor) {
+        const a = b.actor;
+        if (dying) { if (a.state !== 'die' && a.state !== 'dead') a.play('die', now); if (now >= a.until) a.play('dead', now); }
+        else { a.play('combat', now); if (now - bossVis.atkT < 0.05) a.play(id === 'mastermind' ? 'summon' : 'cast', now); else if (hitK > 0.9 && now >= a.until) a.play('hit', now, { speed: 1.5 }); }
+        if (b.amat && b.amat.emissive) b.amat.emissive.setRGB(hitK * 0.5, hitK * 0.4, hitK * 0.5);
+        tickActor(kit, a, dt, now);
+      }
       const P2 = b.P;
       if (P2.armL) { P2.armL.rotation.z = -0.3 - atk * 1.2 + Math.sin(now * 2) * 0.1; P2.armR.rotation.z = 0.3 + atk * 1.4 - Math.sin(now * 2) * 0.1; P2.armR.rotation.x = -atk * 1.2; }
       if (P2.book) { P2.book.position.y = 2.6 + Math.sin(now * 2) * 0.15; P2.book.rotation.y = now * 0.8; P2.stone.position.set(Math.cos(now * 1.5) * 1.3, 3.2 + Math.sin(now * 3) * 0.3, Math.sin(now * 1.5) * 0.9 + 0.3); P2.stone.rotation.y = now * 3; }
@@ -600,6 +770,7 @@ export function createSiegeView(canvas, opts = {}) {
         const pa = Math.min(1, (now - g.born) / 0.4);
         g.g.visible = true; g.g.position.set(a.x, mv > 0.3 ? Math.abs(Math.sin(now * 10)) * 0.15 : 0, a.z); g.g.rotation.y = Math.PI; g.g.scale.setScalar(1.25 * pa);
         g.arm.rotation.x = -Math.max(0, 1 - (now - g.atk) / 0.3) * 2.2 + 0.3;
+        if (g.actor) { g.actor.play(mv > 0.3 ? 'run' : 'combat', now); if (now - g.atk < 0.05) g.actor.play('slash', now); tickActor(kit, g.actor, dt, now); }
         halos.push([a.x, 1.6, a.z, 1, 0.82, 0.35, 0.55, 4.5]);
       } else {
         const d = dragon;
@@ -753,7 +924,7 @@ export function createSiegeView(canvas, opts = {}) {
   const pv = new Vector3();
   const project = (x, y, z) => { pv.set(x, y, z).project(camera); return { x: (pv.x * 0.5 + 0.5) * W, y: (-pv.y * 0.5 + 0.5) * H, vis: pv.z < 1 && pv.z > -1 }; };
   return {
-    kind: 'webgl', renderer,
+    kind: 'webgl', renderer, ready, scene, get loaded() { return !!kit; }, get error() { return loadErr; },
     resize(w, h, pr) { W = w; H = h; renderer.setPixelRatio(pr); renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w / h < 0.7 ? 52 : 42; camera.updateProjectionMatrix(); glow.mat.uniforms.px.value = solid.mat.uniforms.px.value = h * pr * 0.9; embers.material.uniforms.px.value = h * pr * 0.5; },
     setQuality(q) { quality = q; partMult = q.particles; },
     frame, fx, project,
@@ -762,8 +933,8 @@ export function createSiegeView(canvas, opts = {}) {
     riftAt() { return project(0, RIFT_Y, RIFT_Z); },
     drawn: () => drawn,
     shake(v) { shake = Math.max(shake, v); },
-    stats() { const i = renderer.info; return { calls: i.render.calls, tris: i.render.triangles, tex: i.memory.textures, geo: i.memory.geometries, chars: P.body.count, enemies: EN.impBody.count + EN.bruBody.count + EN.wrBody.count, parts: glow.list.length + solid.list.length, bolts: bolts.length }; },
-    dispose() { scene.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); for (const x of global) x.dispose?.(); renderer.dispose(); },
+    stats() { const i = renderer.info; return { calls: i.render.calls, tris: i.render.triangles, tex: i.memory.textures, geo: i.memory.geometries, chars: kit ? [...vis.values()].filter((v) => v.a).length : P.body.count, loaded: !!kit, enemies: kit ? FB.reduce((a, f) => a + [...f.run, ...f.atk].reduce((b, im) => b + im.count, 0), 0) : EN.impBody.count + EN.bruBody.count + EN.wrBody.count, parts: glow.list.length + solid.list.length, bolts: bolts.length }; },
+    dispose() { disposed = true; scene.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); for (const x of global) x.dispose?.(); if (env) env.dispose(); if (kit) kit.dispose(); renderer.dispose(); },
     loseContext() { try { renderer.forceContextLoss(); } catch {} },
   };
 }
