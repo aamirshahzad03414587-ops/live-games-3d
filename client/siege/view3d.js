@@ -107,7 +107,7 @@ export function createSiegeView(canvas, opts = {}) {
     fragmentShader: `varying vec3 vP; uniform float end; uniform float dawn;
       void main(){ float h = clamp(vP.y, -0.2, 1.0); float rift = pow(max(0.0, dot(normalize(vec3(vP.x, vP.y*1.6, vP.z)), vec3(0.0, 0.12, -1.0))), 6.0);
         vec3 top = vec3(0.03, 0.02, 0.09), hor = vec3(0.22, 0.07, 0.24);
-        vec3 c = mix(hor, top, smoothstep(-0.05, 0.55, h)) + vec3(0.55, 0.12, 0.6) * rift * 0.75;
+        vec3 c = mix(hor, top, smoothstep(-0.05, 0.55, h)) + vec3(0.45, 0.1, 0.5) * rift * 0.4;
         vec3 dc = mix(vec3(1.0, 0.62, 0.38), vec3(0.35, 0.55, 0.95), smoothstep(-0.05, 0.6, h));
         c = mix(c, dc, dawn); c = mix(c, vec3(0.35, 0.02, 0.04) * (0.6 + rift), end);
         gl_FragColor = vec4(c, 1.0); }`,
@@ -155,7 +155,7 @@ export function createSiegeView(canvas, opts = {}) {
   const stoneM = toon(0xc8bcd8, { map: stoneTex });
   const wallBody = new Mesh(G.box, stoneM); wallBody.scale.set(22, WALL_Y, WALL_BACK - WALL_FRONT); wallBody.position.set(0, WALL_Y / 2, (WALL_FRONT + WALL_BACK) / 2); wall.add(wallBody);
   const walkway = new Mesh(G.box, toon(0x6a5e78)); walkway.scale.set(22, 0.12, WALL_BACK - WALL_FRONT - 0.3); walkway.position.set(0, WALL_Y + 0.02, (WALL_FRONT + WALL_BACK) / 2 + 0.1); wall.add(walkway);
-  const cren = new InstancedMesh(G.box, toon(0xb4a8c8), 24); cren.frustumCulled = false;
+  const cren = new InstancedMesh(G.box, toon(0x847a96, { map: stoneTex }), 24); cren.frustumCulled = false;
   for (let i = 0; i < 24; i++) put(cren, i, -10.6 + i * 0.92, WALL_Y + 0.42, WALL_FRONT + 0.22, 0.56, 0.84, 0.44);
   wall.add(cren);
   const gateArch = new Mesh(G.box, toon(0x3a2c48)); gateArch.scale.set(3.2, 2.1, 0.3); gateArch.position.set(0, 1.05, WALL_FRONT - 0.05); wall.add(gateArch);
@@ -567,11 +567,11 @@ export function createSiegeView(canvas, opts = {}) {
     stars.material.uniforms.time.value = now; stars.material.uniforms.op.value = 1 - dawn;
     const bossOn = !!w.bo;
     const riftPow = (ending ? (endState.saved ? Math.max(0, 1 - dawn * 1.2) : 1.5) : 1) * (bossOn ? 1.25 : 1) * (1 + 0.12 * Math.sin(now * 3));
-    riftMat.uniforms.time.value = now; riftMat.uniforms.power.value = riftPow; riftMat.uniforms.hue.value = (w.ch || 1) * 0.12 + (bossOn ? 0.2 : 0) + doom * 0.4;
-    const rs = ending ? (endState.saved ? Math.max(0.01, 1 - dawn) : 1 + doom * 0.8) : 1 + ((w.ch || 1) - 1) * 0.12;
+    riftMat.uniforms.time.value = now; riftMat.uniforms.power.value = riftPow * 0.6; riftMat.uniforms.hue.value = (w.ch || 1) * 0.12 + (bossOn ? 0.2 : 0) + doom * 0.4;
+    const rs = 0.72 * (ending ? (endState.saved ? Math.max(0.01, 1 - dawn) : 1 + doom * 0.8) : 1 + ((w.ch || 1) - 1) * 0.12);
     rift.scale.set(rs, rs, 1); riftRing.scale.set(6.2 * rs, 7.8 * rs, 6); riftRing.rotation.z = now * 0.2; riftRing.visible = rs > 0.05;
-    riftLight.intensity = 50 * riftPow * (1 + 0.15 * Math.sin(now * 2.3)); riftLight.color.setHex(doom > 0 ? 0xff2040 : bossOn ? 0xd030c0 : 0xa040ff);
-    riftPool.material.opacity = 0.35 * riftPow;
+    riftLight.intensity = 32 * riftPow * (1 + 0.15 * Math.sin(now * 2.3)); riftLight.color.setHex(doom > 0 ? 0xff2040 : bossOn ? 0xd030c0 : 0xa040ff);
+    riftPool.material.opacity = 0.22 * riftPow;
     for (let i = 0; i < SH; i++) { const a = i / SH * TAU + now * 0.15 * (i % 2 ? 1 : -1), r = 7.5 + (i % 3) * 1.6; put(shards, i, Math.cos(a) * r * rs, RIFT_Y + Math.sin(a) * r * 0.9 * rs + Math.sin(now + i) * 0.4, RIFT_Z - 0.5 + (i % 4) * 0.4, 0.3 + (i % 3) * 0.2, 0.5 + (i % 2) * 0.3, 0.3, now * (0.5 + i * 0.05), i, 0); }
     shards.instanceMatrix.needsUpdate = true;
     hemi.intensity = 0.95 + dawn * 1.2 - doom * 0.4 + (now - flashT < 0.12 ? 1.6 : 0) + (now - ultT < 0.5 ? (0.5 - (now - ultT)) * 4 : 0);
@@ -614,7 +614,7 @@ export function createSiegeView(canvas, opts = {}) {
     TORCH.forEach((x, i) => { const fl = 0.75 + 0.25 * Math.sin(now * (9 + i) + i * 2); halos.push([x, WALL_Y + 1.35, WALL_FRONT + 0.15, 1, 0.55 * fl, 0.18 * fl, 0.9 * fl, 2.2]); halos.push([x, WALL_Y + 1.3, WALL_FRONT + 0.15, 1, 0.9, 0.6, 1, 0.5]); if (Math.random() < dt * 3 * partMult) emit(glow, 1, x, WALL_Y + 1.4, WALL_FRONT + 0.15, { color: 0xffa040, up: 1, speed: 0.8, g: -2, life: 0.7, size: 0.18 }); });
     for (const l of lanterns) halos.push([l[0], l[1], l[2], 1, 0.7, 0.35, 0.8 + 0.15 * Math.sin(now * 7 + l[2]), 2.4]);
     gateRune.material.opacity = 0.45 + 0.3 * Math.sin(now * 2) + bar * 0.3;
-    halos.push([0, RIFT_Y, RIFT_Z, 0.7, 0.25, 1, 0.5 * riftPow, 20]);
+    halos.push([0, RIFT_Y, RIFT_Z, 0.7, 0.25, 1, 0.2 * riftPow, 13]);
     if (Math.random() < dt * 8 * partMult && rs > 0.1) { const a = Math.random() * TAU; emit(glow, 1, Math.cos(a) * 5.6 * rs, RIFT_Y + Math.sin(a) * 7 * rs, RIFT_Z, { colors: [0xc060ff, 0xff3a6a], up: 0.2, speed: 1.5, g: -0.5, life: 1.4, size: 0.5 }); }
 
     // ---------------- defenders
@@ -751,7 +751,7 @@ export function createSiegeView(canvas, opts = {}) {
       if (P2.orb) P2.orb.scale.setScalar(0.42 * (1 + atk * 0.8 + Math.sin(now * 6) * 0.05));
       if (P2.cape) P2.cape.rotation.x = 0.12 + Math.sin(now * 1.8) * 0.08;
       const top = b.top;
-      halos.push([b.g.position.x, b.g.position.y + top * 0.5, bossVis.z - 0.5, b.aura[0], b.aura[1], b.aura[2], 0.55 + atk * 0.6, 12 + atk * 6]);
+      halos.push([b.g.position.x, b.g.position.y + top * 0.5, bossVis.z - 0.5, b.aura[0], b.aura[1], b.aura[2], 0.3 + atk * 0.4, 7 + atk * 4]);
       if (Math.random() < dt * 14 * partMult) emit(glow, 1, bossVis.x + (Math.random() - 0.5) * 3, Math.random() * top * 0.7, bossVis.z, { color: id === 'scientist' ? 0xb060ff : 0xff3060, up: 1, speed: 1.2, g: -2.5, life: 1.0, size: 0.5 });
       if (dying && Math.random() < dt * 30) emit(glow, 3, bossVis.x + (Math.random() - 0.5) * 4, Math.random() * top, bossVis.z, { colors: [0xffffff, 0xffd34d, 0xc060ff], speed: 6, g: 2, life: 0.8, size: 0.7 });
       if (bossE) epos.set(bossE.id, { x: bossVis.x, y: top * 0.55, z: bossVis.z, k: 3 });
