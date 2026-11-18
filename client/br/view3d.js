@@ -294,7 +294,7 @@ export function createView3D(canvas, opts = {}) {
       const ds = []; for (const f of fs) if (!(f.flags & FLAG.air)) ds.push(Math.hypot(f.x - tx, f.z - tz));
       ds.sort((a, b) => a - b);
       const spread = Math.max(ds.length ? ds[Math.min(ds.length - 1, Math.max(2, Math.floor(ds.length * 0.5)))] : 3, 2.5);
-      dist = MathUtils.clamp(8 + spread * (aspect < 0.7 ? 1.6 : 1.1), 11, 27);
+      dist = MathUtils.clamp(8 + spread * (aspect < 0.7 ? 1.6 : 1.1), 12.5, 27);
       pitch = 0.78;
     } else if (ph === 'ceremony') { tx = 0; tz = 0.2; ty = 1.9; dist = 9.5; pitch = 0.34; }
     else { const ds = fs.map((f) => Math.hypot(f.x, f.z)).sort((a, b) => a - b); const sp = ds.length ? ds[Math.floor(ds.length * 0.75)] : 4; dist = MathUtils.clamp(9 + sp * (aspect < 0.7 ? 1.7 : 1.2), 13, 28); pitch = 0.72; }

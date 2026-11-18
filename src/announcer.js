@@ -10,11 +10,15 @@ export class Announcer {
     const item = { ...line, at: this.now() };
     // banner words are shown right away, even when the voice is busy
     if (line.banner) this.broadcast({ t: 'banner', text: line.banner, pri: line.pri, gift: line.gift || null });
-    item.audio = this.listeners() > 0 && this.tts ? this.tts.synth(line.text).catch(() => null) : Promise.resolve(null);
     this.pending.push(item);
     this.pending.sort((a, b) => b.pri - a.pri || a.at - b.at);
     while (this.pending.length > 3) { this.pending.pop(); this.stats.dropped++; }
     this.pump();
+  }
+  // voice is made lazily (only for the line about to play, plus one prefetch) so dropped lines never hit the TTS service
+  audioFor(item) {
+    if (!item.audio) item.audio = this.listeners() > 0 && this.tts ? this.tts.synth(item.text).catch(() => null) : Promise.resolve(null);
+    return item.audio;
   }
   clear() { this.pending = []; }
   pump() {
@@ -30,7 +34,9 @@ export class Announcer {
     const item = this.pending.shift();
     if (!item) return;
     this.making = true;
-    const a = await Promise.race([item.audio, new Promise((r) => setTimeout(() => r(null), 3500))]);
+    const audio = this.audioFor(item);
+    if (this.pending[0]) this.audioFor(this.pending[0]);
+    const a = await Promise.race([audio, new Promise((r) => setTimeout(() => r(null), 3500))]);
     this.making = false;
     const dur = a ? a.duration : Math.min(4, 0.9 + item.text.length / 16);
     if (!a) this.stats.noVoice++;
