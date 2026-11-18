@@ -61,7 +61,8 @@ for (let f = 0; f < SECONDS * FPS; f++) {
     pinned.add(lastInfo.floor);
     await page.evaluate((k) => { const s = window.__tower; s.kinds = k.slice(0, s.doors); if (s.prophecy >= 0) s.prophecy = s.safeDoor(); }, PIN[lastInfo.floor]);
   }
-  lastInfo = await page.evaluate((dt) => window.__render.frame(dt), 1 / FPS);
+  // a stuck frame (crashed renderer / starved box) fails loudly instead of hanging forever
+  lastInfo = await Promise.race([page.evaluate((dt) => window.__render.frame(dt), 1 / FPS), new Promise((_, rej) => setTimeout(() => rej(new Error(`frame ${f} (${t.toFixed(2)}s) timed out`)), 90000))]);
   const fn = `${TMP}f${String(f).padStart(5, '0')}.jpg`;
   await page.screenshot({ path: fn, type: 'jpeg', quality: 90 });
   if (f % 150 === 0) console.log(`${t.toFixed(1)}s ${JSON.stringify(lastInfo)}  (${((Date.now() - t0) / 1000).toFixed(0)} s real)`);

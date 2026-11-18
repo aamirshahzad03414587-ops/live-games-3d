@@ -54,7 +54,8 @@ for (let f = 0; f < SECONDS * FPS; f++) {
   const t = f / FPS;
   while (si < rest.length && rest[si].t <= t) { await page.evaluate((e) => window.__input(e), rest[si].ev); si++; }
   if (info && info.phase === 'vote') { if (vi < 0) vi = 0; if (vi < votes.length && f % 4 === 0) { const ev = { ...votes[vi].ev, type: 'chat' }; await page.evaluate((e) => window.__input(e), ev); vi++; } }
-  info = await page.evaluate((dt) => window.__render.frame(dt), 1 / FPS);
+  // a stuck frame (crashed renderer / starved box) fails loudly instead of hanging forever
+  info = await Promise.race([page.evaluate((dt) => window.__render.frame(dt), 1 / FPS), new Promise((_, rej) => setTimeout(() => rej(new Error('frame timed out')), 90000))]);
   const fn = `${TMP}f${String(f).padStart(5, '0')}.jpg`;
   await page.screenshot({ path: fn, type: 'jpeg', quality: 90 });
   if (f % 150 === 0) console.log(`${t.toFixed(1)}s ${JSON.stringify(info)}  (${((Date.now() - t0) / 1000).toFixed(0)} s real)`);

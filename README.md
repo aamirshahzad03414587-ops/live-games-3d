@@ -60,7 +60,11 @@ minutes leave the queue until they comment again.
 The whole chat climbs a spooky tower together, floor by floor, narrated by Mystic Mira (the fortune-live Tarot
 Mistress, voice `en-US-AvaNeural`). Go LIVE exactly like the Battle Royale, just open `/tower` instead.
 
-- **Comment anything** → you join the climb as a lantern-carrying chibi with your name tag.
+- **Nothing to read on screen**: Mira speaks how to play, what each gift does, every riddle and every event. On screen:
+  short name tags, the door numbers, a vote bar under each door, a small ring (time left + lantern oil, ❓ during a
+  riddle) and the top climber's name at the end.
+- **Comment anything** → you join the climb as a lantern-carrying KayKit adventurer (Knight, Barbarian, Mage, Rogue)
+  tinted in your colour; fallen climbers float behind as see-through ghosts; ghost monsters are spectral skeletons.
 - **Vote a door**: `1` `2` `3` (also `1️⃣`, `one`, `door 2`, `left` / `right` / `middle`) during the 12 s vote. The
   most-voted door opens: 💰 treasure (oil + points), 💀 trap (some of the party fall; voters of that door first; Mira's
   foretold victim goes first), 👹 monster (spam chat to hit it, `attack` hits harder), ❓ riddle (first correct
@@ -91,7 +95,13 @@ fallback, diag), one room built at a time (two while climbing), fog + flickering
 A chat-powered siege defense, narrated by a deep anime-trailer voice (`en-US-ChristopherNeural`, −6 % rate, −10 Hz).
 Go LIVE exactly like the other games, just open `/siege`.
 
-**The story** (anime-style lore cards with art + narration; the full 6-card intro plays on the first session of a
+**Nothing to read on screen**: the narrator tells the story, explains classes and gifts, reads the story vote and
+every event. On screen: short name tags, a small ring (time + Ascension barrier), a 🌍 survivors counter, a thin boss
+bar and two icon bars during the story vote. Defenders are KayKit adventurers (mage = Mage, warrior = Barbarian, archer
+= Rogue, healer = Knight), the hordes are KayKit skeletons (baked flip-book poses, one instanced draw per pose), the
+bosses are giant KayKit figures, the city / wall / citadel are KayKit City, Halloween, Dungeon and Hexagon props.
+
+**The story** (full-bleed anime art with a slow push-in + narration, no words on screen; the full 6-card intro plays on the first session of a
 LIVE and every 3rd one after, a 2-card recap otherwise): the Dark Dimension, a magic underworld, clashed with Earth.
 A grieving scientist, denied the AIDS cure for his daughter by a greedy boss, his wife and journalist brother gone,
 was corrupted by an ancient book and a dark teleport stone and opened the rift at Earth's core. A hidden Mastermind
@@ -167,12 +177,13 @@ pinned commits:
 |---|---|---|---|
 | Character Pack: Adventurers 1.0 | [KayKit-Character-Pack-Adventures-1.0](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0) | `672074b` | Knight, Barbarian, Mage, Rogue, hooded Rogue |
 | Character Pack: Skeletons 1.0 | [KayKit-Character-Pack-Skeletons-1.0](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0) | `15b62b9` | skeleton bots / enemies, all animation clips |
-| Medieval Hexagon Pack 1.0 | [KayKit-Medieval-Hexagon-Pack-1.0](https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0) | `84fa4e9` | BR hex island, castle, villages, forests, clouds |
-| Dungeon Remastered 1.0 | [KayKit-Dungeon-Remastered-1.0](https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0) | `b0ca9bd` | (tower / siege environments) |
-| Halloween Bits 1.0 | [KayKit-Halloween-Bits-1.0](https://github.com/KayKit-Game-Assets/KayKit-Halloween-Bits-1.0) | `6dc69bf` | (tower / siege props) |
+| Medieval Hexagon Pack 1.0 | [KayKit-Medieval-Hexagon-Pack-1.0](https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0) | `84fa4e9` | BR hex island, castle, villages, forests, clouds; siege citadel + catapult towers |
+| Dungeon Remastered 1.0 | [KayKit-Dungeon-Remastered-1.0](https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0) | `b0ca9bd` | tower doorways, candles, banners, furniture; siege wall, torches, rubble |
+| Halloween Bits 1.0 | [KayKit-Halloween-Bits-1.0](https://github.com/KayKit-Game-Assets/KayKit-Halloween-Bits-1.0) | `6dc69bf` | tower crypt props, pumpkins; siege graves, dead trees, fences, lamp posts, crypt |
+| City Builder Bits 1.0 | [KayKit-City-Builder-Bits-1.0](https://github.com/KayKit-Game-Assets/KayKit-City-Builder-Bits-1.0) | `6397691` | siege ruined city: buildings, cars, street lights |
 
 Rebuild the optimised GLBs: `bash tools/assets/fetch.sh` (clones the packs into `../assets-src` at those commits),
-`node tools/assets/build-chars.mjs`, `node tools/assets/build-env.mjs br`.
+`node tools/assets/build-chars.mjs`, `node tools/assets/build-env.mjs br|tower|siege`.
 
 ## Develop
 ```

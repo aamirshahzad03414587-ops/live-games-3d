@@ -44,7 +44,8 @@ let si = 0; const t0 = Date.now(); let lastInfo = null;
 for (let f = 0; f < SECONDS * FPS; f++) {
   const t = f / FPS;
   while (si < S.length && S[si].t <= t) { await page.evaluate((ev) => window.__input(ev), S[si].ev); si++; }
-  lastInfo = await page.evaluate((dt) => window.__render.frame(dt), 1 / FPS);
+  // a stuck frame (crashed renderer / starved box) fails loudly instead of hanging forever
+  lastInfo = await Promise.race([page.evaluate((dt) => window.__render.frame(dt), 1 / FPS), new Promise((_, rej) => setTimeout(() => rej(new Error('frame timed out')), 90000))]);
   await page.screenshot({ path: `${TMP}f${String(f).padStart(5, '0')}.jpg`, type: 'jpeg', quality: 90 });
   if (f % 150 === 0) console.log(`${t.toFixed(1)}s ${JSON.stringify(lastInfo)}  (${((Date.now() - t0) / 1000).toFixed(0)} s real)`);
   if ([4, 12, 18, 30, 36, 48].includes(Math.round(t * 1000) / 1000)) fs.copyFileSync(`${TMP}f${String(f).padStart(5, '0')}.jpg`, `${TMP}still-${t}.jpg`);
