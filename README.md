@@ -8,7 +8,7 @@ phone you stream from and go LIVE with screen sharing.
 |---|---|---|
 | ⚔️ Viewer Battle Royale | `/br` | ready |
 | 🏰 Mira's Haunted Tower | `/tower` | ready |
-| 🌌 Dark Dimension Siege | `/siege` | later |
+| 🌀 Dark Dimension Siege | `/siege` | ready |
 
 ## Going LIVE with the Battle Royale (iPhone)
 1. Open `https://<your-service>.onrender.com/br` in Safari. Tip: Share → **Add to Home Screen**, then open it from the
@@ -83,6 +83,46 @@ and leave as real viewers join. Settings: `TOWER_GATHER_SECONDS` (16), `TOWER_VO
 `MIRA_PITCH` (or the admin page). Same iPhone safety as the BR (DPR ≤ 1.5, ≤ 780 px, auto quality, context-loss → 2D
 fallback, diag), one room built at a time (two while climbing), fog + flickering candle lights, GPU dust.
 
+## 🌀 Dark Dimension Siege (`/siege`)
+A chat-powered siege defense, narrated by a deep anime-trailer voice (`en-US-ChristopherNeural`, −6 % rate, −10 Hz).
+Go LIVE exactly like the other games, just open `/siege`.
+
+**The story** (anime-style lore cards with art + narration; the full 6-card intro plays on the first session of a
+LIVE and every 3rd one after, a 2-card recap otherwise): the Dark Dimension, a magic underworld, clashed with Earth.
+A grieving scientist, denied the AIDS cure for his daughter by a greedy boss, his wife and journalist brother gone,
+was corrupted by an ancient book and a dark teleport stone and opened the rift at Earth's core. A hidden Mastermind
+stole 5 billion souls. The Lord of Earth sacrificed 1.5 billion to awaken the Ascension System. **1.5 billion
+survivors remain** (the giant counter), and they vanish unless the Dark Dimension is beaten.
+
+- **Comment anything** → you join the citadel wall as a survivor (random class). Pick one: `mage` / `🔮` (fireballs,
+  area), `warrior` / `⚔️` (holds the gate, melee), `archer` / `🏹` (fast arrows, hits fliers), `healer` / `💚`
+  (heals the fallen, tops up the barrier). Every comment = a faster attack.
+- **Waves** of imps, brutes and wraiths pour out of the rift. While creatures are alive, souls drain; creatures that
+  reach the wall take survivors (the counter drops with a red "−N" chip).
+- **Chapters**: 3 waves + a boss. Ch 1 boss **The Corrupted Scientist**, Ch 2 his **Ascended** form, Ch 3 **The
+  Mastermind**. Boss attacks: beams, slams, summons; the barrier blocks them.
+- **Story votes** after bosses (`1` / `2`, or the words): *Seal the rift* (fewer creatures, stronger Mastermind) vs
+  *Hunt the Mastermind* (more creatures, weaker final boss); *Save the city* (+120 M survivors) vs *Save the army*
+  (2 guardian heroes join for good). The choices set the ending.
+- **Likes** charge the 🛡️ Ascension barrier (absorbs damage; fades slowly). Every 500 likes = **Ascension pulse**
+  (all fallen rise, +20 barrier, a screen-wide blast).
+- **Follow** = blessed (×1.2 power, rise again, +10 barrier) · **Share** = all fallen rise + 15 barrier.
+
+| Coins (one gift × count) | Power |
+|---|---|
+| 1–4 (Rose, TikTok, GG) | ✨ Spell volley: homing bolts from you (more coins, more bolts) |
+| 5–29 (Finger Heart…) | 🔷 Shield rune: +12 barrier + a volley |
+| 30–99 (Doughnut…) | 🛡️ Guardian hero: a golden knight holds the gate |
+| 100–499 (Hand Hearts, Corgi…) | ⚡ Ascension: screen-wide ultimate + you ascend (×3 power) |
+| 500+ (Money Gun, Lion…) | 🐉 Dragon ally: a dragon burns the field; on a boss, 25 % of its life |
+
+Endings: **🌅 EARTH SAVED** (dawn, shoutout of the top defender, the story you chose, survivors left) or **🌑 EARTH
+FELL**. Top defenders (points, kills, saves) and the best "survivors saved" persist (signed copy on the phone). Quiet
+rooms: 🤖 bots fill the wall up to 6 and leave as real viewers join (never on the board). Sessions run ~8–13 min.
+Settings: `SIEGE_GATHER_SECONDS` (14), `SIEGE_VOTE_SECONDS` (16), `SIEGE_MIN_DEFENDERS` (6), `SIEGE_BOTS`,
+`SIEGE_INTRO` (0 = no lore), `SIEGE_SPAWN_MUL`, `SIEGE_ENEMY_HP_MUL`, `NARRATOR_VOICE`, `NARRATOR_RATE`,
+`NARRATOR_PITCH` (or the admin page). Same iPhone safety as the other games.
+
 ## Settings (Render environment)
 `ADMIN_KEY` (admin page + PC TikFinity link), `TIKTOK_USERNAME`, `LIVE_SOURCE` (direct | tikfinity | both),
 `SIGN_API_KEY` (optional), `BR_LOBBY_SECONDS` (20), `BR_ARENA_CAP` (50), `BR_MIN_FIGHTERS` (8), `BR_BOTS` (1/0),
@@ -114,17 +154,20 @@ npm install
 npm start                       # http://localhost:3940/br  (no ADMIN_KEY = admin only from this computer)
 npm run simulate -- busy 120    # fake busy LIVE (quiet | busy | gifts | demo), BASE=... ADMIN_KEY=... for a remote server
 npm test
-node tools/build.mjs            # rebuild public/br/app.js + public/tower/app.js after editing client/ (commit the bundle; Render doesn't build it)
+node tools/build.mjs            # rebuild public/{br,tower,siege}/app.js after editing client/ (commit the bundle; Render doesn't build it)
 MINUTES=10 node tools/soak-webkit.mjs        # iPhone-profile WebKit soak (Playwright)
 node tools/render-demo.mjs screenshots/br-demo.mp4 56   # vertical demo video with sound
 node tools/render-tower-demo.mjs screenshots/tower-demo.mp4 56
 GAME=tower MINUTES=10 node tools/soak-webkit.mjs
+node tools/render-siege-demo.mjs screenshots/siege-demo.mp4 56
+GAME=siege MINUTES=10 node tools/soak-webkit.mjs
 ```
 Code: `public/shared/br-sim.js` (rules, isomorphic), `public/shared/commands.js` (commands, gift tiers),
 `public/shared/br-lines.js` (announcer), `src/games/br.js` (server loop), `src/tiktok.js` (LIVE connection, from
 fortune-live), `src/tts.js` (free Edge voice + Google fallback, from fortune-live), `client/br/*` (overlay: 3D view,
 2D fallback, HUD). Tower: `public/shared/tower-{sim,data,lines}.js`, `src/games/tower.js`, `src/tower-board.js`,
-`client/tower/*`.
+`client/tower/*`. Siege: `public/shared/siege-{sim,data,lines}.js`, `src/games/siege.js`, `src/siege-board.js`,
+`client/siege/*`, lore art `public/siege/lore-*.jpg`.
 
 Free hosting note: Render's free plan has 750 instance hours a month **shared by all free services**. fortune-live runs
 24/7 with a keep-alive (~720–744 h), so this service has **no keep-alive**: it sleeps after 15 min without visitors and
