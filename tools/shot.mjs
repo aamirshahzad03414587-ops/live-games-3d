@@ -12,6 +12,6 @@ page.on('console', (m) => logs.push(m.type() + ': ' + m.text()));
 page.on('pageerror', (e) => logs.push('PAGEERROR ' + e.message));
 await page.goto(url);
 let t = 0;
-for (const s of times.split(',').map(Number)) { await page.waitForTimeout((s - t) * 1000); t = s; await page.screenshot({ path: `${out}-${s}.png` }); console.log('shot', `${out}-${s}.png`, JSON.stringify(await page.evaluate(() => window.__br && { fps: window.__br.fps, level: window.__br.level, stats: window.__br.stats(), phase: window.__br.world.phase, n: window.__br.world.fighters.length }))); }
+for (const s of times.split(',').map(Number)) { await page.waitForTimeout((s - t) * 1000); t = s; await page.screenshot({ path: `${out}-${s}.png` }); console.log('shot', `${out}-${s}.png`, JSON.stringify(await page.evaluate(() => { const g = window.__br || window.__towerUI; return g && { fps: g.fps, level: g.level, stats: g.stats(), phase: g.world.phase, n: (g.world.fighters || g.world.members).length, floor: g.world.floor }; }))); }
 console.log(logs.slice(0, 20).join('\n'));
 await browser.close();

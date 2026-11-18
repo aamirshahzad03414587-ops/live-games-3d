@@ -358,7 +358,7 @@ function drawHud(now) {
     const tot = (w.vc || []).reduce((a, b) => a + b, 0) || 1;
     for (let i = 0; i < w.nd; i++) {
       const p = view.doorTop(i); if (!p || !p.vis) continue;
-      const y = Math.max(cssH * 0.37, Math.min(cssH * 0.62, p.y));
+      const y = Math.max(cssH * 0.38, Math.min(cssH * 0.6, p.y + cssH * 0.105));
       if (w.phase === 'vote' || w.phase === 'enter') {
         const c = w.vc ? w.vc[i] || 0 : 0, lead = c > 0 && c === Math.max(...w.vc);
         const bw = u * 15, bh = u * 7.2;
@@ -425,12 +425,12 @@ function domHud(now) {
   const w = world, body = document.body;
   const fight = w.phase === 'monster' || w.phase === 'boss', rid = w.phase === 'riddle' && w.ri >= 0;
   // how-to banner follows the phase
-  let title = '❤️ LIKES KEEP THE LANTERNS LIT!', cls = '';
-  if (w.phase === 'gather') title = '🏮 COMMENT TO JOIN THE CLIMB!';
-  else if (w.phase === 'vote' || w.phase === 'enter') { title = w.nd === 2 ? '🚪 COMMENT 1 (LEFT) OR 2 (RIGHT)!' : '🚪 COMMENT 1 · 2 · 3 TO PICK A DOOR!'; cls = 'vote'; }
-  else if (fight) { title = w.phase === 'boss' ? '👻 BOSS! SPAM CHAT TO FIGHT!' : '⚔️ SPAM CHAT TO FIGHT!'; cls = 'fight'; }
-  else if (rid) { title = '❓ ANSWER THE RIDDLE IN CHAT!'; cls = 'riddle'; }
-  else if (w.phase === 'end') title = '🏮 COMMENT TO JOIN THE NEXT CLIMB!';
+  let title = '❤️ LIKES = LANTERN OIL', cls = '', chips = ['🚪 vote doors 1 · 2 · 3', '❓ answer riddles', '🎁 gifts = powers'];
+  if (w.phase === 'gather' || w.phase === 'end') { title = '🏮 COMMENT TO JOIN!'; chips = ['🚪 vote doors 1 · 2 · 3', '❤️ likes = lantern oil', '➕ follow = spare life']; }
+  else if (w.phase === 'vote' || w.phase === 'enter') { title = w.nd === 2 ? '🚪 COMMENT 1 OR 2!' : '🚪 COMMENT 1 · 2 · 3!'; cls = 'vote'; chips = ['🔮 any gift = safe door', '🛡️ 5🪙 = shield']; }
+  else if (fight) { title = w.phase === 'boss' ? '👻 BOSS! SPAM CHAT!' : '⚔️ SPAM CHAT TO HIT!'; cls = 'fight'; chips = ['💬 every comment = a hit', '❤️ likes hit too', '🎁 gifts = huge hits']; }
+  else if (rid) { title = '❓ ANSWER IN CHAT!'; cls = 'riddle'; chips = ['🏆 first right answer wins']; }
+  const ck = chips.join('|'); if ($('howChips').__k !== ck) { $('howChips').__k = ck; $('howChips').innerHTML = chips.map((c) => `<span>${esc(c)}</span>`).join(''); }
   setText('howTitle', title); $('howTitle').className = 'title' + (cls ? ' ' + cls : '');
   // pill
   let txt;
@@ -458,6 +458,7 @@ function domHud(now) {
     rc.classList.toggle('solved', !!(s && s.id));
     setText('riddleA', s ? (s.id ? `✅ ${nameOf(s.id)}: ${s.a.toUpperCase()}` : `❌ It was: ${s.a.toUpperCase()}`) : `✍️ First to comment the answer wins! ⏳${Math.ceil(w.tl)}s`);
   }
+  body.classList.toggle('voting', ['enter', 'vote', 'reveal'].includes(w.phase));
   body.classList.toggle('fighting', fight && !!w.mo); body.classList.toggle('riddling', rid);
   // likes
   setText('likeN', String(w.hype || 0)); $('likeBar').style.width = Math.min(100, ((w.hype || 0) / 300) * 100) + '%';

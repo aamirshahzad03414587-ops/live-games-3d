@@ -140,7 +140,7 @@ export function createTowerView(canvas, opts = {}) {
     add(new Mesh(G.floor, mat({ map: floorTexFor(id, list), side: DoubleSide })));
     add(new Mesh(G.wall, mat({ map: brickTex, color: T.wall, side: BackSide })));
     const pil = inst(G.box, mat({ color: new Color(T.wall).multiplyScalar(0.7) }), 8);
-    for (let i = 0; i < 8; i++) { const a = (i / 8) * TAU; put(pil, i, Math.cos(a) * (RW - 0.3), FH / 2, Math.sin(a) * (RW - 0.3), 0.9, FH, 0.9, -a); }
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * TAU; if (Math.sin(a) > 0.3) { put(pil, i, 0, -50, 0, 0.01, 0.01, 0.01, 0); continue; } put(pil, i, Math.cos(a) * (RW - 0.3), FH / 2, Math.sin(a) * (RW - 0.3), 0.9, FH, 0.9, -a); }
     const trim = add(new Mesh(G.torus, mat({ color: 0x8a6a3a, emissive: 0x2a1a08 }))); trim.rotation.x = Math.PI / 2; trim.scale.set(RW - 0.4, RW - 0.4, 2); trim.position.y = 0.05;
     // spiral stairs up to the next floor
     const steps = inst(G.step, mat({ color: 0x6a6070 }), 16);
@@ -148,7 +148,7 @@ export function createTowerView(canvas, opts = {}) {
     const post = add(new Mesh(G.cyl, mat({ color: 0x4a4050 }))); post.position.set(STAIR.x, FH / 2, STAIR.z); post.scale.set(0.5, FH, 0.5);
     // candles (flames are glow points, drawn with the halos)
     const flames = [], cps = [];
-    for (let i = 0; i < 10; i++) { const a = -Math.PI * 0.95 + (i / 9) * Math.PI * 1.9 + Math.PI / 2, r = RW - 1.2, x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.hypot(x - STAIR.x, z - STAIR.z) < 2.6) continue; cps.push([x, z, 0.5 + (i % 3) * 0.35]); }
+    for (let i = 0; i < 10; i++) { const a = -Math.PI * 0.95 + (i / 9) * Math.PI * 1.9 + Math.PI / 2, r = RW - 1.2, x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.hypot(x - STAIR.x, z - STAIR.z) < 2.6 || z > 3) continue; cps.push([x, z, 0.5 + (i % 3) * 0.35]); }
     const cm = inst(G.cyl, mat({ color: 0xf3ead2, emissive: 0x3a2a10 }), cps.length);
     const st = inst(G.cyl6, mat({ color: 0x6a4a2a }), cps.length);
     cps.forEach(([x, z, h], i) => { put(cm, i, x, h / 2 + 0.6, z, 0.22, h, 0.22); put(st, i, x, 0.3, z, 0.5, 0.6, 0.5); flames.push([x, h + 0.75, z]); });
@@ -279,7 +279,7 @@ export function createTowerView(canvas, opts = {}) {
   const ghostEyes = new InstancedMesh(keep(new SphereGeometry(0.07, 6, 5)), keep(new MeshBasicMaterial({ color: 0x1a1030 })), GCAP * 2); ghostEyes.frustumCulled = false; ghostEyes.count = 0; scene.add(ghostEyes);
   // party shield dome
   const dome = new Mesh(keep(new SphereGeometry(1, 20, 12, 0, TAU, 0, Math.PI / 2)), keep(new ShaderMaterial({
-    transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide, uniforms: { time: { value: 0 }, a: { value: 0 } },
+    transparent: true, depthWrite: false, blending: AdditiveBlending, uniforms: { time: { value: 0 }, a: { value: 0 } },
     vertexShader: 'varying vec3 vN; varying vec3 vV; varying float vY; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); vY = position.y; gl_Position = projectionMatrix * mv; }',
     fragmentShader: 'varying vec3 vN; varying vec3 vV; varying float vY; uniform float time; uniform float a; void main(){ float f = 1.0 - abs(dot(vN, vV)); float band = 0.5 + 0.5*sin(vY*30.0 - time*3.0); gl_FragColor = vec4(vec3(0.35,0.75,1.0) * (pow(f,2.0)*0.9 + band*0.08) * a, 1.0); }',
   })));
@@ -401,7 +401,7 @@ export function createTowerView(canvas, opts = {}) {
         vec3 p = vec3((fract(s.x + sin(t + s.z * 6.0) * 0.05) - 0.5) * 18.0, base + fy * 8.5, (fract(s.z + cos(t * 0.7 + s.x * 5.0) * 0.05) - 0.5) * 16.0);
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         vA = (0.4 + 0.6 * (0.5 + 0.5 * sin(time * 1.5 + s.x * 40.0))) * smoothstep(0.0, 0.15, fy) * smoothstep(1.0, 0.8, fy);
-        gl_PointSize = (2.0 + s.z * 3.0) * px / max(1.0, -mv.z); gl_Position = projectionMatrix * mv; }`,
+        vA *= smoothstep(2.5, 7.0, -mv.z); gl_PointSize = min((0.07 + s.z * 0.1) * px / max(1.0, -mv.z), 14.0); gl_Position = projectionMatrix * mv; }`,
     fragmentShader: 'uniform vec3 tint; varying float vA; void main(){ float d = length(gl_PointCoord-0.5)*2.0; gl_FragColor = vec4(tint * vA * max(0.0, 1.0-d) * 0.55, 1.0); }',
   })));
   dust.frustumCulled = false; dust.renderOrder = 3; scene.add(dust);
@@ -411,7 +411,7 @@ export function createTowerView(canvas, opts = {}) {
   const white = new Color(1, 1, 1), cA = new Color(), cB = new Color();
   let quality = { particles: 1, halos: true, maxChars: CAP };
   let time = 0, shake = 0, flashT = -9, lightning = -9, thunderAt = 0, curFloor = 0, baseY = 0, lastW = null;
-  const camPos = new Vector3(0, 6, 14), camLook = new Vector3(0, 2.4, -2), tgtPos = new Vector3(), tgtLook = new Vector3();
+  const camPos = new Vector3(0, 10, 20), camLook = new Vector3(0, 2.6, -2.4), tgtPos = new Vector3(), tgtLook = new Vector3();
   const fogCol = new Color(0x1a1030), fogTgt = new Color(), lightCol = new Color(0xffb36b), lightTgt = new Color();
   let monVis = { kind: '', t0: 0, hitT: -9, atkT: -9, dieT: -9, x: 0, z: -4 };
   let chestT = -9, chestX = 0, bladeT = -9;
@@ -468,21 +468,24 @@ export function createTowerView(canvas, opts = {}) {
     const k = w.pd > 0 ? 1 - Math.max(0, Math.min(1, w.tl / w.pd)) : 1;
     if (w.phase === 'climb') {
       const lift = w.lift ? 2 : 1, e2 = Math.max(0, Math.min(1, (k - 0.15) / 0.8)), up = e2 * e2 * (3 - 2 * e2) * FH * lift;
-      tgtPos.set(STAIR.x - 6.0 + Math.sin(e2 * Math.PI) * 2.2, baseY + 4.8 + up, 8.2 - Math.sin(e2 * Math.PI) * 2.6);
-      tgtLook.set(STAIR.x - 1.4, baseY + 2.4 + up, STAIR.z);
+      tgtPos.set(STAIR.x - 9.0 + Math.sin(e2 * Math.PI) * 2.6, baseY + 6.2 + up, 12.5 - Math.sin(e2 * Math.PI) * 3);
+      tgtLook.set(STAIR.x - 1.2, baseY + 2.6 + up, STAIR.z);
     } else if (w.phase === 'reveal' && w.ch >= 0) {
       const dx = doorPos(cur, w.ch), e = k * k * (3 - 2 * k);
-      tgtPos.set(dx * 0.55, baseY + 4.4, 6.6 - e * 1.4); tgtLook.set(dx * 0.9, baseY + 2.2, DOOR_Z);
+      tgtPos.set(dx * 0.5, baseY + 7.6, 15 - e * 2.6); tgtLook.set(dx * 0.85, baseY + 2.4, DOOR_Z);
+    } else if ((w.phase === 'treasure' || w.phase === 'trap') && w.ch >= 0) {
+      const dx = doorPos(cur, w.ch);
+      tgtPos.set(dx * 0.35, baseY + 8.6, 16.5); tgtLook.set(dx * 0.6, baseY + 2.2, -4.2);
     } else if (w.phase === 'monster' || w.phase === 'boss') {
       const b = w.phase === 'boss';
-      tgtPos.set(Math.sin(now * 0.25) * 1.2, baseY + (b ? 7.2 : 6.2), b ? 15.6 : 14.4); tgtLook.set(0, baseY + (b ? 3.4 : 2.6), -3);
+      tgtPos.set(Math.sin(now * 0.25) * 1.4, baseY + (b ? 11.4 : 10.4), b ? 22 : 20.4); tgtLook.set(0, baseY + (b ? 3.6 : 2.8), -3);
     } else if (w.phase === 'end') {
       const a = now * 0.18; tgtPos.set(Math.sin(a) * 9, baseY + 6, 3 + Math.cos(a) * 9); tgtLook.set(0, baseY + 1.4, 2.4);
     } else if (w.phase === 'vote') {
       let lead = 0, mx = 0; (w.vc || []).forEach((v, i) => { if (v > mx) { mx = v; lead = i; } });
       const dx = mx ? doorPos(cur, lead) * 0.25 : 0;
-      tgtPos.set(dx * 0.6, baseY + 5.6, 13.2); tgtLook.set(dx, baseY + 2.6, -2.6);
-    } else { tgtPos.set(0, baseY + 5.6, 13.6); tgtLook.set(0, baseY + 2.5, -2.4); }
+      tgtPos.set(dx * 0.6, baseY + 9.8, 19.4); tgtLook.set(dx, baseY + 2.7, -2.8);
+    } else { tgtPos.set(0, baseY + 10, 20); tgtLook.set(0, baseY + 2.6, -2.4); }
     const ck = Math.min(1, dt * (w.phase === 'climb' ? 3.2 : 2.2));
     if (camPos.distanceTo(tgtPos) > 30) { camPos.copy(tgtPos); camLook.copy(tgtLook); }
     camPos.lerp(tgtPos, ck); camLook.lerp(tgtLook, ck);
@@ -493,7 +496,7 @@ export function createTowerView(canvas, opts = {}) {
 
     // Mira floats beside the doors and faces the camera
     const mY = baseY + 1.0 + Math.sin(now * 1.3) * 0.18;
-    if (w.phase === 'climb') miraPos.set(-4.6, camLook.y - 1.6, -3.6); else if (w.phase === 'monster' || w.phase === 'boss') miraPos.set(-6.6, mY + 0.6, -3.2); else miraPos.set(-6.1, mY, -4.9);
+    if (w.phase === 'climb') miraPos.set(-4.6, camLook.y - 1.6, -3.6); else if (w.phase === 'monster' || w.phase === 'boss') miraPos.set(-5.0, mY + 1.2, 0.2); else if (['reveal', 'treasure', 'trap'].includes(w.phase)) miraPos.set(-6.4, mY + 2.4, -5.2); else miraPos.set(-4.7, mY + 0.9, -1.4);
     mira.position.lerp(miraPos, Math.min(1, dt * 3));
     mira.quaternion.copy(camera.quaternion);
     miraTalk += ((miraSpeaking ? 1 : 0) - miraTalk) * Math.min(1, dt * 6);
@@ -564,9 +567,9 @@ export function createTowerView(canvas, opts = {}) {
     if (Math.random() < 0.02) { for (const [id, s] of ghostVis) if (now - s.seen > 3) ghostVis.delete(id); for (const [id, s] of vis) if (now - s.seen > 5) vis.delete(id); }
     // shield dome over the party
     const want = (w.sh || 0) > 0, du = dome.material.uniforms;
-    du.a.value += ((want ? 0.55 : 0) - du.a.value) * Math.min(1, dt * 3); du.time.value = now;
+    du.a.value += ((want ? (['trap', 'monster', 'boss'].includes(w.phase) ? 0.75 : 0.4) : 0) - du.a.value) * Math.min(1, dt * 3); du.time.value = now;
     dome.visible = du.a.value > 0.02;
-    if (cn) { dome.position.set(cx / cn, baseY, cz / cn); dome.scale.setScalar(3.5 + Math.sqrt(cn) * 0.75); }
+    if (cn) { dome.position.set(cx / cn, baseY, cz / cn); const r = 1.7 + Math.sqrt(cn) * 0.62; dome.scale.set(r, r * 0.62, r * 0.75); }
 
     // ---------------------------------------------------------------- monster
     const mo = w.mo;
@@ -734,7 +737,7 @@ export function createTowerView(canvas, opts = {}) {
   const project = (x, y, z) => { pv.set(x, y, z).project(camera); return { x: (pv.x * 0.5 + 0.5) * W, y: (-pv.y * 0.5 + 0.5) * H, vis: pv.z < 1 && pv.z > -1 }; };
   return {
     kind: 'webgl', renderer,
-    resize(w, h, pr) { W = w; H = h; renderer.setPixelRatio(pr); renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w / h < 0.7 ? 62 : 50; camera.updateProjectionMatrix(); glow.mat.uniforms.px.value = solid.mat.uniforms.px.value = h * pr * 0.9; dust.material.uniforms.px.value = h * pr * 0.5; },
+    resize(w, h, pr) { W = w; H = h; renderer.setPixelRatio(pr); renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w / h < 0.7 ? 50 : 42; camera.updateProjectionMatrix(); glow.mat.uniforms.px.value = solid.mat.uniforms.px.value = h * pr * 0.9; dust.material.uniforms.px.value = h * pr * 0.5; },
     setQuality(q) { quality = q; partMult = q.particles; },
     frame, fx, project,
     speaking(on) { miraSpeaking = on; },

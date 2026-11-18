@@ -442,7 +442,8 @@ export class Tower {
     for (const m of al) (this.phase === 'vote' || this.phase === 'reveal') && m.door >= 0 ? perDoor[m.door].push(m) : idle.push(m);
     const flower = (list, cx, cz, sp, sq) => list.forEach((m, i) => { const r = sp * Math.sqrt(i + 0.5), a = i * 2.39996; m.tx = cx + Math.cos(a) * r; m.tz = cz + Math.sin(a) * r * sq; });
     const fight = this.phase === 'monster' || this.phase === 'boss';
-    flower(idle, 0, fight ? 3.2 : 2.4, 0.7, 0.62);
+    const sp = idle.length > 40 ? 0.52 : idle.length > 20 ? 0.6 : 0.7;
+    flower(idle, 0, fight ? -0.6 : -1.9, sp, 0.55);
     perDoor.forEach((list, d) => { if (list.length) flower(list, dx[d], DOOR_Z + 3.0, 0.5, 0.7); });
     const climbing = this.phase === 'climb';
     const sx = STAIR.x - STAIR.r, sz = STAIR.z;
