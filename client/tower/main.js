@@ -338,7 +338,7 @@ function renderBoard(now) {
   const list = (useAll ? board.all : board.session) || [];
   const best = useAll ? board.bestFloor : board.sessionBest;
   const title = (useAll ? '👑 ALL-TIME CLIMBERS' : "🏰 TODAY'S CLIMBERS") + (best ? ` · best F${best}` : '');
-  const html = list.length ? list.slice(0, 5).map((p) => `<li><span class="nm">${esc(p.name)}</span><span class="sc">${p.pts}✨${(p.best || p.floors) ? ' F' + (p.best || p.floors) : ''}</span></li>`).join('') : '';
+  const html = list.length ? list.slice(0, 5).map((p) => `<li><span class="nm">${esc(p.name)}</span><span class="sc">${p.pts}✨${p.best ? ' · F' + p.best : ''}</span></li>`).join('') : '';
   const key = title + html;
   if (el.__k === key) return; el.__k = key;
   $('boardTitle').textContent = title;

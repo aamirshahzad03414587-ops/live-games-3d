@@ -55,3 +55,37 @@ test('server: pages, admin key, sim events reach the game over the websocket', a
   assert.ok(st.br.humans >= 1);
   ws.close();
 });
+
+test('server: /tower page, board API, tower websocket and admin controls', async (t) => {
+  const port = 39000 + Math.floor(Math.random() * 900);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lg-'));
+  const srv = spawn(process.execPath, ['src/server.js'], { env: { ...process.env, PORT: String(port), ADMIN_KEY: 'test-key-123', TTS: '0', TTS_SELFTEST: '0', DATA_DIR: dir, TIKTOK_USERNAME: '' }, stdio: 'pipe' });
+  t.after(() => srv.kill());
+  await new Promise((r) => srv.stdout.on('data', (d) => /Live Games 3D on/.test(d) && r()));
+  const base = `http://127.0.0.1:${port}`;
+  assert.equal((await fetch(base + '/tower')).status, 200);
+  assert.equal((await fetch(base + '/tower/app.js')).status, 200);
+  assert.equal((await fetch(base + '/tower/tower.css')).status, 200);
+  assert.equal((await fetch(base + '/assets/mira-tower.png')).status, 200);
+  const hz = await fetch(base + '/healthz').then((r) => r.json());
+  assert.ok(hz.tower);
+  const bd = await fetch(base + '/api/tower/board').then((r) => r.json());
+  assert.ok(Array.isArray(bd.session) && Array.isArray(bd.all)); assert.equal(bd.signed, undefined, 'no signed copy on the public API');
+  assert.equal((await fetch(base + '/api/admin/tower/skip', { method: 'POST' })).status, 401);
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?game=tower`);
+  const msgs = [];
+  ws.on('message', (m) => msgs.push(JSON.parse(m)));
+  await new Promise((r) => ws.on('open', r));
+  const post = (p, b) => fetch(base + '/api/admin' + p, { method: 'POST', headers: { 'content-type': 'application/json', 'x-admin-key': 'test-key-123' }, body: JSON.stringify(b || {}) }).then((r) => r.json());
+  assert.equal((await post('/sim/chat', { name: 'Hina', text: 'hello' })).ok, true);
+  await new Promise((res) => setTimeout(res, 700));
+  assert.equal(msgs[0].t, 'hello'); assert.equal(msgs[0].game, 'tower');
+  assert.ok(msgs[0].tiers.some((x) => x.id === 'prophecy'));
+  assert.ok(msgs.some((m) => m.t === 'roster' && m.add.some((a) => a.name === 'Hina')), 'Hina took a lantern');
+  assert.ok(msgs.some((m) => m.t === 's' && m.f.length % 6 === 0 && m.f.length >= 6), 'tower snapshots stream');
+  const st = await fetch(base + '/api/admin/status', { headers: { 'x-admin-key': 'test-key-123' } }).then((x) => x.json());
+  assert.ok(st.tower && st.settings.tower);
+  assert.equal((await post('/tower/skip')).ok, true);
+  assert.equal((await post('/tower/reset-board')).ok, true);
+  ws.close();
+});

@@ -7,7 +7,7 @@ phone you stream from and go LIVE with screen sharing.
 | Game | Path | Status |
 |---|---|---|
 | ⚔️ Viewer Battle Royale | `/br` | ready |
-| 🏰 Mira's Haunted Tower | `/tower` | next |
+| 🏰 Mira's Haunted Tower | `/tower` | ready |
 | 🌌 Dark Dimension Siege | `/siege` | later |
 
 ## Going LIVE with the Battle Royale (iPhone)
@@ -23,7 +23,7 @@ PC / TikTok LIVE Studio: add a Link source `https://<host>/br?mode=pc` (1080×19
 direct connection, use `/br?mode=pc&key=ADMIN_KEY` (the overlay forwards TikFinity events; keep that link private)
 and set `LIVE_SOURCE=tikfinity` or `both`.
 
-## How viewers play
+## How viewers play (Battle Royale)
 - **Comment anything** → you drop into the arena as a cute fighter with your name and colour. Fighters auto-fight.
 - `attack NAME` / `⚔️ NAME` / `@name` → go after that player · `shield` / `🛡️` · `dash` / `💨`
 - `revenge` → hunt whoever last hit you · `dance` / `💃` · `color pink|gold|blue|…` → change colour
@@ -51,6 +51,37 @@ shoutout, 12 s) → leaderboard of today's champs and all-time legends.
 Busy rooms: up to 50 fighters in the arena (`BR_ARENA_CAP`); others wait in a queue (followers/gifters first), drop
 in as reinforcements during the first 40% of the storm, and everyone rotates in next round. Viewers silent for 10+
 minutes leave the queue until they comment again.
+
+## 🏰 Mira's Haunted Tower (`/tower`)
+The whole chat climbs a spooky tower together, floor by floor, narrated by Mystic Mira (the fortune-live Tarot
+Mistress, voice `en-US-AvaNeural`). Go LIVE exactly like the Battle Royale, just open `/tower` instead.
+
+- **Comment anything** → you join the climb as a lantern-carrying chibi with your name tag.
+- **Vote a door**: `1` `2` `3` (also `1️⃣`, `one`, `door 2`, `left` / `right` / `middle`) during the 12 s vote. The
+  most-voted door opens: 💰 treasure (oil + points), 💀 trap (some of the party fall; voters of that door first; Mira's
+  foretold victim goes first), 👹 monster (spam chat to hit it, `attack` hits harder), ❓ riddle (first correct
+  comment wins +40 points and a shoutout; wrong/no answer costs oil).
+- **Every 5th floor: a ghost boss** in the bell tower. Every comment hits, likes chip at it; lose and many fall.
+- **Lantern oil = team health**: it burns down (faster higher up). 💖 Likes refill it; every 300 likes = the lanterns
+  **blaze** (+15 oil, a fallen climber rises). Oil at 0 = the run ends in darkness.
+- **Follow** = a spare life (saves you from one fall) · **Share** = spare life + oil.
+- Fallen climbers become ghosts until a rescue, a like blaze or the next climb.
+
+| Coins (one gift × count) | Power |
+|---|---|
+| 1–4 (Rose, TikTok, GG) | 🔮 Prophecy: Mira reveals the safe door (saved for the next vote if none is open) + oil |
+| 5–29 (Finger Heart…) | 🛡️ Shield: blocks the next trap or boss slam (stacks to 3) |
+| 30–99 (Doughnut…) | 💖 Rescue: up to 5 fallen rise + 25 oil |
+| 100–499 (Corgi, Hand Hearts…) | 🪄 Skip floor: Mira's lift carries everyone past a floor (once per floor; else a blessing). In a fight: a massive hit |
+| 500+ (Money Gun, Lion…) | 👻 Ghost Boss: summons a boss fight with huge loot (3-floor cooldown; else everyone rises). In a boss fight: a crushing blow |
+
+Rooms: library, bone crypt, hall of mirrors, clock room, spider attic, alchemist's lab, ghostly ballroom; the bell
+tower for bosses. Runs end when the oil is gone, everyone has fallen, or the party reaches floor 30. The highest floor
+and top climbers persist (signed copy on the phone, like the BR board). Quiet rooms: bots (🤖) fill the party up to 6
+and leave as real viewers join. Settings: `TOWER_GATHER_SECONDS` (16), `TOWER_VOTE_SECONDS` (12),
+`TOWER_MIN_PARTY` (6), `TOWER_BOTS`, `TOWER_RIDDLE_SECONDS`, `TOWER_BOSS_SECONDS`, `MIRA_VOICE`, `MIRA_RATE`,
+`MIRA_PITCH` (or the admin page). Same iPhone safety as the BR (DPR ≤ 1.5, ≤ 780 px, auto quality, context-loss → 2D
+fallback, diag), one room built at a time (two while climbing), fog + flickering candle lights, GPU dust.
 
 ## Settings (Render environment)
 `ADMIN_KEY` (admin page + PC TikFinity link), `TIKTOK_USERNAME`, `LIVE_SOURCE` (direct | tikfinity | both),
@@ -83,14 +114,16 @@ npm install
 npm start                       # http://localhost:3940/br  (no ADMIN_KEY = admin only from this computer)
 npm run simulate -- busy 120    # fake busy LIVE (quiet | busy | gifts | demo), BASE=... ADMIN_KEY=... for a remote server
 npm test
-node tools/build.mjs            # rebuild public/br/app.js after editing client/ (commit the bundle; Render doesn't build it)
+node tools/build.mjs            # rebuild public/br/app.js + public/tower/app.js after editing client/ (commit the bundle; Render doesn't build it)
 MINUTES=10 node tools/soak-webkit.mjs        # iPhone-profile WebKit soak (Playwright)
 node tools/render-demo.mjs screenshots/br-demo.mp4 56   # vertical demo video with sound
+GAME=tower node tools/render-demo.mjs screenshots/tower-demo.mp4 56
 ```
 Code: `public/shared/br-sim.js` (rules, isomorphic), `public/shared/commands.js` (commands, gift tiers),
 `public/shared/br-lines.js` (announcer), `src/games/br.js` (server loop), `src/tiktok.js` (LIVE connection, from
 fortune-live), `src/tts.js` (free Edge voice + Google fallback, from fortune-live), `client/br/*` (overlay: 3D view,
-2D fallback, HUD).
+2D fallback, HUD). Tower: `public/shared/tower-{sim,data,lines}.js`, `src/games/tower.js`, `src/tower-board.js`,
+`client/tower/*`.
 
 Free hosting note: Render's free plan has 750 instance hours a month **shared by all free services**. fortune-live runs
 24/7 with a keep-alive (~720–744 h), so this service has **no keep-alive**: it sleeps after 15 min without visitors and
