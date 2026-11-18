@@ -22,15 +22,15 @@ if (qs.get('clean') === '1') document.body.classList.add('clean');
 
 // ------------------------------------------------------------------ quality levels (auto by measured FPS)
 const QL = PHONE ? [
-  { pr: 1.5, maxW: 780, labels: 22, particles: 1, dust: true, props: true },
-  { pr: 1.25, maxW: 700, labels: 16, particles: 0.75, dust: true, props: true },
-  { pr: 1.0, maxW: 600, labels: 12, particles: 0.5, dust: false, props: true },
-  { pr: 0.8, maxW: 480, labels: 9, particles: 0.35, dust: false, props: false },
+  { pr: 1.5, maxW: 780, labels: 12, particles: 1, dust: true, props: true, maxChars: 36, animLod: 1 },
+  { pr: 1.25, maxW: 700, labels: 10, particles: 0.75, dust: true, props: true, maxChars: 30, animLod: 1 },
+  { pr: 1.0, maxW: 600, labels: 8, particles: 0.5, dust: false, props: true, maxChars: 24, animLod: 2 },
+  { pr: 0.8, maxW: 480, labels: 6, particles: 0.35, dust: false, props: false, maxChars: 16, animLod: 2 },
 ] : [
-  { pr: 2, maxW: Number(qs.get('maxw')) || 1080, labels: 28, particles: 1, dust: true, props: true },
-  { pr: 1.5, maxW: 900, labels: 22, particles: 1, dust: true, props: true },
-  { pr: 1.0, maxW: 700, labels: 16, particles: 0.6, dust: false, props: true },
-  { pr: 0.8, maxW: 540, labels: 11, particles: 0.4, dust: false, props: false },
+  { pr: 2, maxW: Number(qs.get('maxw')) || 1080, labels: 14, particles: 1, dust: true, props: true, maxChars: 60, animLod: 1 },
+  { pr: 1.5, maxW: 900, labels: 12, particles: 1, dust: true, props: true, maxChars: 48, animLod: 1 },
+  { pr: 1.0, maxW: 700, labels: 10, particles: 0.6, dust: false, props: true, maxChars: 36, animLod: 2 },
+  { pr: 0.8, maxW: 540, labels: 8, particles: 0.4, dust: false, props: false, maxChars: 24, animLod: 2 },
 ];
 let level = qs.has('q') ? Math.max(0, Math.min(3, Number(qs.get('q')))) : 0;
 const fixedQ = qs.has('q');
@@ -43,6 +43,7 @@ function makeView() {
   if (!want2d) {
     try {
       view = createTowerView(canvas, { maxChars: 60, particles: PHONE ? 700 : 1100, aa: !PHONE || IOS, preserve: RENDER });
+      view.ready && view.ready.catch(() => mark('models-fail'));   // keeps the procedural look if the models can't load
       canvas.addEventListener('webglcontextlost', onLost, false);
       canvas.addEventListener('webglcontextrestored', onRestored, false);
       return;
@@ -59,7 +60,7 @@ function to2D() {
 function onLost(e) {
   e.preventDefault(); lost++; paused = true; mark('ctx-lost');
   lostTimes.push(performance.now()); lostTimes = lostTimes.filter((t) => performance.now() - t < 120e3);
-  showNotice('Graphics reset… recovering');
+  showNotice();
   clearTimeout(onLost.t); onLost.t = setTimeout(() => { if (paused) { localStorage.setItem('lg_force2d', '1'); to2D(); paused = false; hideNotice(); } }, 4000);
   diag && diag.send('ctxlost');
 }
@@ -117,16 +118,16 @@ function connect() {
     try { const b = JSON.parse(localStorage.getItem('lg_towerBoard') || 'null'); if (b && b.json && b.sig) ws.send(JSON.stringify({ t: 'restore', json: b.json, sig: b.sig })); } catch {}
   };
   ws.onmessage = (m) => { let d; try { d = JSON.parse(m.data); } catch { return; } onMsg(d); };
-  ws.onclose = () => { ws = null; mark('ws-close'); setTimeout(connect, wsWait); wsWait = Math.min(10000, wsWait * 1.7); if (N.ws) showNotice('Reconnecting…'); };
+  ws.onclose = () => { ws = null; mark('ws-close'); setTimeout(connect, wsWait); wsWait = Math.min(10000, wsWait * 1.7); if (N.ws) showNotice(); };
   ws.onerror = () => {};
 }
 function onMsg(d) {
   switch (d.t) {
-    case 'hello': roster.clear(); applyRoster(d.roster); snaps = []; offset = null; tiers = d.tiers || tiers; renderGifts(); onBoard(d); pushSnap(d.snap); break;
+    case 'hello': roster.clear(); applyRoster(d.roster); snaps = []; offset = null; tiers = d.tiers || tiers; onBoard(d); pushSnap(d.snap); break;
     case 'roster': applyRoster(d.add, d.del); break;
     case 's': pushSnap(d); break;
     case 'say': say(d.text, d.url, d.dur); break;
-    case 'banner': banner(d.text); break;
+    case 'banner': break;   // big words are spoken now, not shown
     case 'board': onBoard(d); break;
     case 'status': tiktokState = d.tiktok?.state || ''; $('conn').className = tiktokState === 'connected' ? 'connected' : /wait|connecting|reconnect/.test(tiktokState) ? 'waiting' : tiktokState === 'error' ? 'error' : ''; maybeTikFinity(d.tiktok); break;
   }
@@ -212,7 +213,6 @@ function localWorld(dt, now) {
   return buildWorld(s, null, 0);
 }
 function localSay(l, now) {
-  if (l.banner) banner(l.banner);
   const item = { ...l, at: now, p: null };
   item.p = fetch('/api/say?voice=mira&text=' + encodeURIComponent(l.text)).then((r) => r.json()).catch(() => ({ url: null }));
   sayPending++; item.p.finally(() => sayPending--);
@@ -233,119 +233,74 @@ async function pumpLocalSay(now) {
 // ------------------------------------------------------------------ events -> juice, sound, HUD
 const nameOf = (id) => roster.get(id)?.name || '?';
 const colorOf = (id) => '#' + ((roster.get(id)?.color ?? 0xffffff) >>> 0).toString(16).padStart(6, '0');
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const NB = (id) => `<span style="color:${colorOf(id)}">${esc(nameOf(id))}</span>`;
-const dmgNums = [];
 let voteSqueakT = 0, hitSfxT = 0, solved = null;
 function handleEvent(e, stale) {
   N.ev++;
   if (!stale && view && !paused) try { view.fx(e, world); } catch (err) { N.err++; }
   const S = (k, v) => { if (!stale) audio.sfx(k, audio.now(), v); };
   switch (e.k) {
-    case 'gather': S('wind'); $('feed').innerHTML = ''; solved = null; break;
+    case 'gather': S('wind'); solved = null; break;
     case 'floor': S(e.boss ? 'bell' : 'creak'); if (e.boss) S('organ'); solved = null; break;
     case 'vote':
       if (e.start) S('chime');
       else if (clockNow() - voteSqueakT > 0.12) { voteSqueakT = clockNow(); S('squeak', 0.35); }
       break;
-    case 'prophecy': S('chime'); toast('prophecy', `🔮 Door ${e.door + 1} is SAFE`, e.banked ? 'Mira kept a prophecy for you' : 'the cards have spoken'); break;
+    case 'prophecy': S('chime'); break;
     case 'reveal': S('creak'); S(({ treasure: 'coin', trap: 'trap', monster: 'roar', riddle: 'organ' })[e.kinds[e.door]] || 'creak'); break;
     case 'treasure': S('coin'); S('fanfare', 0.5); break;
     case 'trap': S('trap'); if (e.trap === 'shards' || e.trap === 'chandelier') S('shatter'); if (e.blocked) S('shield'); break;
-    case 'fall': S('ghost', 0.6); if (!stale) feed('fall', `👻 ${NB(e.id)} fell`); break;
-    case 'rise': S('heal', 0.6); if (!stale) feed('rise', `✨ ${NB(e.id)} rises again`); break;
+    case 'fall': S('ghost', 0.6); break;
+    case 'rise': S('heal', 0.6); break;
     case 'monster': S('roar'); S(e.boss ? 'organ' : 'heart'); break;
     case 'hit': {
       if (clockNow() - hitSfxT > 0.06) { hitSfxT = clockNow(); S(e.c ? 'crit' : 'punch', 0.55); }
-      if (!stale && dmgNums.length < 28) dmgNums.push({ v: e.d, c: e.c, t0: clockNow(), j: (Math.random() - 0.5) * 2 });
       break;
     }
     case 'matk': S(e.slam ? 'boom' : 'roar', e.slam ? 1 : 0.5); break;
-    case 'mwin': S('fanfare'); S('cheer'); if (!stale && e.top) feed('win', `⚔️ ${NB(e.top)} struck hardest`); break;
+    case 'mwin': S('fanfare'); S('cheer'); break;
     case 'mlose': S('trap'); S('ghost'); break;
     case 'riddle': S('organ'); S('chime'); break;
-    case 'rwin': S('fanfare'); S('coin'); solved = { id: e.id, a: e.a }; if (!stale) feed('win', `❓ ${NB(e.id)} solved it: <b>${esc(e.a)}</b>`); break;
+    case 'rwin': S('fanfare'); S('coin'); solved = { id: e.id, a: e.a }; break;
     case 'rfail': S('ghost'); solved = { id: 0, a: e.a }; break;
     case 'climb': S(e.lift ? 'power' : 'creak', 0.6); break;
-    case 'gift': S('coin'); giftToast(e); break;
+    case 'gift': S('coin'); break;   // gifts are shown as VFX in the 3D view and thanked by the voice
     case 'summon': S('bell'); S('organ'); break;
-    case 'follow': S('power'); toast('perk', `➕ ${esc(nameOf(e.id))} followed`, '→ spare life'); break;
-    case 'share': S('power'); toast('perk', `🔁 ${esc(nameOf(e.id))} shared`, '→ spare life + oil'); break;
-    case 'blaze': S('heal'); S('cheer'); toast('perk', '❤️ LANTERNS BLAZE!', e.rescued ? `${esc(nameOf(e.rescued))} rises + full glow` : 'oil refilled'); break;
+    case 'follow': S('power'); break;
+    case 'share': S('power'); break;
+    case 'blaze': S('heal'); S('cheer'); break;
     case 'lowfuel': S('heart'); break;
     case 'end': S(e.reason === 'top' ? 'fanfare' : 'bell'); if (e.reason === 'top') S('cheer'); showEnd(e); break;
   }
   if (e.k !== 'hit' && e.k !== 'vote') mark(e.k);
 }
-function giftToast(e) {
-  const t = tiers.find((x) => x.id === e.tier) || {};
-  let sub = `→ ${t.label || e.tier}`;
-  if (e.tier === 'prophecy') sub = e.door !== undefined ? `→ 🔮 door ${e.door + 1} is safe` : e.banked ? '→ 🔮 prophecy saved for the next vote' : '→ 🔮 + lantern oil';
-  if (e.tier === 'shield') sub = `→ 🛡️ shield ×${e.shields}`;
-  if (e.tier === 'rescue') sub = `→ 💖 ${e.n || 0} fallen rise + oil`;
-  if (e.tier === 'skip') sub = e.hitBoss ? '→ 🪄 massive hit!' : e.blessing ? '→ 🪄 blessing: oil + rescues' : '→ 🪄 Mira\'s lift: skip a floor';
-  if (e.tier === 'boss') sub = e.hitBoss ? '→ 👻 crushing blow!' : e.blessing ? '→ 👻 blessing: all fallen rise' : '→ 👻 GHOST BOSS incoming';
-  toast(e.tier, `${t.icon || '🎁'} ${esc(nameOf(e.id))} sent ${esc(e.giftName || 'a gift')}`, sub);
-}
 function clockNow() { return RENDER ? vclock : performance.now() / 1000; }
-function feed(cls, html) {
-  const el = document.createElement('div'); el.className = 'k ' + cls; el.innerHTML = html;
-  const f = $('feed'); f.prepend(el); while (f.children.length > 3) f.lastChild.remove();
-}
-function toast(kind, title, sub) {
-  const el = document.createElement('div'); el.className = 't ' + kind; el.innerHTML = `${title}<small>${sub}</small>`;
-  const t = $('toasts'); t.prepend(el); while (t.children.length > 2) t.lastChild.remove();
-  later(() => el.remove(), 3800);
-}
-let bannerT = 0;
-function banner(text) {
-  const b = $('banner'); b.hidden = false; b.classList.remove('show'); void b.offsetWidth; b.textContent = text; b.classList.add('show');
-  clearTimeout(bannerT); bannerT = later(() => { b.hidden = true; }, 1650);
-}
 function flash(op = 0.7) { const f = $('flash'); f.style.transition = 'none'; f.style.opacity = String(op); void f.offsetWidth; f.style.transition = 'opacity 0.9s ease-out'; f.style.opacity = '0'; }
+// Mira speaks; nothing is written on screen (her billboard glows while she talks)
 let sayT = 0;
 function say(text, url, dur) {
   N.say++;
-  const el = $('say'); el.hidden = false; el.className = 'mira';
-  el.innerHTML = `<img src="/assets/mira-face.jpg" alt=""><div class="txt"><span class="who">🔮 MYSTIC MIRA</span>${esc(text)}</div>`;
   const ms = Math.max(1800, (dur || 2) * 1000 + 600);
   view && view.speaking(true);
-  clearTimeout(sayT); sayT = later(() => { el.hidden = true; view && view.speaking(false); }, ms);
+  clearTimeout(sayT); sayT = later(() => { view && view.speaking(false); }, ms);
   if (url) audio.voice(url, dur);
 }
+const shortName = (n, max = 10) => { n = String(n || '?').replace(/\s+/g, ' ').trim(); return [...n].length > max ? [...n].slice(0, max - 1).join('') + '…' : n; };
+// the end card: only the top climber's name (Mira says the rest)
 function showEnd(e) {
-  const w = $('winner');
-  $('winTitle').textContent = e.reason === 'top' ? '👑 THE TOP OF THE TOWER!' : e.reason === 'dark' ? `🕯️ LIGHTS OUT · FLOOR ${e.floor}` : `👻 ALL FALLEN · FLOOR ${e.floor}`;
   const top = (e.top || []).filter((id) => roster.has(id));
-  if (top.length) { $('winName').textContent = nameOf(top[0]); $('winName').style.color = colorOf(top[0]); $('winSub').textContent = (top.length > 1 ? `with ${top.slice(1, 3).map(nameOf).join(' & ')} · ` : '') + (roster.get(top[0])?.bot ? 'bots led the climb – comment to beat them!' : 'top climber! 🎉'); }
-  else { $('winName').textContent = 'The tower wins'; $('winName').style.color = '#d08cff'; $('winSub').textContent = 'comment to start a new climb'; }
-  w.hidden = false; w.style.animation = 'none'; void w.offsetWidth; w.style.animation = '';
-}
-function renderGifts() {
-  $('gifts').innerHTML = [...tiers].reverse().map((t) => `<div><span>${t.icon} ${esc(t.label)}</span><b>${t.min}🪙</b></div>`).join('');
+  if (!top.length) return;
+  $('winName').textContent = shortName(nameOf(top[0]), 18); $('winName').style.color = colorOf(top[0]);
+  const w = $('winner'); w.hidden = false; w.style.animation = 'none'; void w.offsetWidth; w.style.animation = '';
 }
 function onBoard(d) {
   if (!d || (!d.session && !d.all)) return;
   board = d;
   if (d.signed) try { localStorage.setItem('lg_towerBoard', JSON.stringify(d.signed)); } catch {}
 }
-let boardMode = 0, boardFlip = 0;
-function renderBoard(now) {
-  const show = ['gather', 'end', 'climb', 'treasure'].includes(world.phase);
-  const el = $('board'); el.hidden = !show; if (!show || !board) return;
-  if (now - boardFlip > 7) { boardFlip = now; boardMode ^= 1; }
-  const useAll = boardMode && board.all && board.all.length;
-  const list = (useAll ? board.all : board.session) || [];
-  const best = useAll ? board.bestFloor : board.sessionBest;
-  const title = (useAll ? '👑 ALL-TIME CLIMBERS' : "🏰 TODAY'S CLIMBERS") + (best ? ` · best F${best}` : '');
-  const html = list.length ? list.slice(0, 5).map((p) => `<li><span class="nm">${esc(p.name)}</span><span class="sc">${p.pts}✨${p.best ? ' · F' + p.best : ''}</span></li>`).join('') : '';
-  const key = title + html;
-  if (el.__k === key) return; el.__k = key;
-  $('boardTitle').textContent = title;
-  $('boardList').innerHTML = html || '<div class="empty">No climbers yet – comment to grab a lantern! 🏮</div>';
-}
 
-// ------------------------------------------------------------------ HUD canvas: names, door votes, damage numbers
+// ------------------------------------------------------------------ HUD canvas: almost no words. Short name tags, a vote bar + icon
+// under each door (the number itself is carved above the door in 3D), and one small ring: time left + lantern oil.
+let ringPhase = '', ringMax = {};
 function drawHud(now) {
   const pr = hud.__pr || 1, u = cssW / 100;
   hg.setTransform(1, 0, 0, 1, 0, 0); hg.clearRect(0, 0, hud.width, hud.height); hg.setTransform(pr, 0, 0, pr, 0, 0);
@@ -353,130 +308,118 @@ function drawHud(now) {
   const w = world, q = QL[level];
   hg.textAlign = 'center'; hg.textBaseline = 'middle'; hg.lineJoin = 'round';
   const F = (wt, px) => `${wt} ${px}px -apple-system, "Segoe UI", Roboto, sans-serif`;
-  // door plaques: live vote counts + bars, the 🔮 SAFE marker, and the outcome icons after the reveal
   if (w.nd && ['vote', 'reveal', 'treasure', 'trap', 'monster', 'riddle', 'victory', 'enter'].includes(w.phase)) {
-    const tot = (w.vc || []).reduce((a, b) => a + b, 0) || 1;
+    const tot = (w.vc || []).reduce((a, b) => a + b, 0) || 1, mx = Math.max(0, ...(w.vc || [0]));
     for (let i = 0; i < w.nd; i++) {
       const p = view.doorTop(i); if (!p || !p.vis) continue;
-      const y = Math.max(cssH * 0.38, Math.min(cssH * 0.6, p.y + cssH * 0.105));
+      const y = Math.max(cssH * 0.3, Math.min(cssH * 0.55, p.y - u * 3));
       if (w.phase === 'vote' || w.phase === 'enter') {
-        const c = w.vc ? w.vc[i] || 0 : 0, lead = c > 0 && c === Math.max(...w.vc);
-        const bw = u * 15, bh = u * 7.2;
-        hg.fillStyle = lead ? 'rgba(120,50,200,0.92)' : 'rgba(20,8,40,0.82)'; rr(p.x - bw / 2, y - bh, bw, bh, u * 2); hg.fill();
-        hg.strokeStyle = lead ? '#ffd36a' : 'rgba(255,255,255,0.35)'; hg.lineWidth = u * 0.5; hg.stroke();
-        hg.fillStyle = '#ffd36a'; hg.font = F(900, u * 4.6); hg.fillText(String(i + 1), p.x - bw * 0.24, y - bh * 0.52);
-        hg.fillStyle = '#fff'; hg.font = F(900, u * 3.6); hg.fillText(String(c), p.x + bw * 0.2, y - bh * 0.52);
-        hg.fillStyle = 'rgba(255,255,255,0.18)'; rr(p.x - bw / 2 + u, y - u * 1.6, bw - u * 2, u * 0.9, u * 0.45); hg.fill();
-        hg.fillStyle = '#ffd36a'; rr(p.x - bw / 2 + u, y - u * 1.6, (bw - u * 2) * (c / tot), u * 0.9, u * 0.45); hg.fill();
-        if (w.pr === i) { const pulse = 1 + Math.sin(now * 6) * 0.06; hg.font = F(900, u * 3.6 * pulse); hg.lineWidth = u * 0.9; hg.strokeStyle = '#2a0050'; hg.strokeText('🔮 SAFE', p.x, y - bh - u * 3); hg.fillStyle = '#e8c8ff'; hg.fillText('🔮 SAFE', p.x, y - bh - u * 3); }
+        const c = w.vc ? w.vc[i] || 0 : 0, lead = c > 0 && c === mx, bw = u * 13;
+        hg.fillStyle = 'rgba(10,4,24,0.55)'; rr(p.x - bw / 2, y, bw, u * 1.3, u * 0.65); hg.fill();
+        hg.fillStyle = lead ? '#ffd36a' : 'rgba(255,230,170,0.75)'; rr(p.x - bw / 2, y, Math.max(u * 1.3, bw * (c / tot)), u * 1.3, u * 0.65); if (c) hg.fill();
+        if (w.pr === i) { const pulse = 1 + Math.sin(now * 6) * 0.08; hg.font = F(900, u * 7 * pulse); hg.fillText('🔮', p.x, y - u * 5); }
       } else if (w.kinds && w.kinds[i]) {
         const chosen = w.ch === i;
-        hg.globalAlpha = chosen ? 1 : 0.6;
-        hg.font = F(900, u * (chosen ? 8 : 5.5)); hg.fillText(KIND_ICON[w.kinds[i]] || '', p.x, y - u * 3.5);
+        hg.globalAlpha = chosen ? 1 : 0.5;
+        hg.font = F(900, u * (chosen ? 8 : 5)); hg.fillText(KIND_ICON[w.kinds[i]] || '', p.x, y - u * 2);
         hg.globalAlpha = 1;
       }
     }
   }
-  // name tags (priority: active commenters, crown, humans); ghosts are not drawn here (they float in the 3D view)
+  drawTags(now, u, q, F);
+  drawRing(now, u);
+  hg.globalAlpha = 1;
+}
+function drawTags(now, u, q, F) {
+  const w = world;
   const drawn = (view.drawn() || []).filter((d) => !d.ghost);
   const cand = drawn.map((f) => ({ f, s: (f.flags & TFLAG.cmd ? 8 : 0) + (f.flags & TFLAG.crown ? 6 : 0) + (f.flags & TFLAG.gift ? 5 : 0) + (f.flags & TFLAG.bot ? 0 : 3) + (w.pdc === f.id ? 9 : 0) }));
   cand.sort((a, b) => b.s - a.s);
-  const fs = Math.round(u * (cand.length > 14 ? 2.5 : 2.9));
+  const crowded = cand.length > 10;
+  const fs = Math.round(u * (crowded ? 2.3 : 2.6));
   const placed = [];
-  for (const { f } of cand.slice(0, q.labels)) {
+  let shown = 0;
+  for (const { f } of cand) {
+    if (shown >= q.labels) break;
     const p = view.project(f.x, f.y, f.z); if (!p.vis) continue;
-    if (p.x < -40 || p.x > cssW + 40 || p.y < cssH * 0.3 || p.y > cssH * 0.9) continue;
-    if (placed.some((o) => Math.abs(o.x - p.x) < u * 9 && Math.abs(o.y - p.y) < u * 3.6)) continue;
-    placed.push(p);
-    const info = f.info || {}, bot = f.flags & TFLAG.bot, doom = w.pdc === f.id;
-    const vd = (f.flags >> DOOR_SHIFT) & 3;
-    const name = (doom ? (w.pk === 'fall' ? '💀 ' : '💰 ') : bot ? '🤖 ' : f.flags & TFLAG.crown ? '👑 ' : '') + info.name + (f.flags & TFLAG.life ? ' ❤️' : '') + (vd && w.phase === 'vote' ? ` →${vd}` : '');
-    hg.font = F(800, fs);
-    const tw = Math.min(hg.measureText(name).width, u * 30), h = fs * 1.35, y = p.y - h * 0.6;
-    hg.fillStyle = doom ? 'rgba(90,0,60,0.85)' : bot ? 'rgba(40,40,60,0.7)' : 'rgba(14,6,34,0.78)';
-    rr(p.x - tw / 2 - u * 1.3, y - h / 2, tw + u * 2.6, h, h / 2); hg.fill();
+    if (p.x < u * 4 || p.x > cssW - u * 4 || p.y < cssH * 0.24 || p.y > cssH * 0.8) continue;
+    if (placed.some((o) => Math.abs(o.x - p.x) < u * 10 && Math.abs(o.y - p.y) < u * 3.4)) continue;
+    placed.push(p); shown++;
+    const info = f.info || {}, bot = f.flags & TFLAG.bot;
+    const name = (f.flags & TFLAG.crown ? '👑' : '') + shortName(bot ? String(info.name || '').replace(/^Bot\s+/i, '') : info.name, crowded ? 8 : 10) + (f.flags & TFLAG.life ? '♥' : '');
+    // the later a tag is in priority order, the fainter it is (crowds fade into the scene)
+    const alpha = (bot ? 0.55 : 0.92) * (1 - Math.min(0.5, shown / (q.labels * 2)));
+    hg.globalAlpha = alpha;
+    hg.font = F(700, fs);
+    const tw = Math.min(hg.measureText(name).width, u * 22), h = fs * 1.3, y = p.y - h * 0.4;
+    hg.fillStyle = 'rgba(8,4,20,0.5)'; rr(p.x - tw / 2 - u, y - h / 2, tw + u * 2, h, h / 2); hg.fill();
     hg.fillStyle = '#' + ((info.color ?? 0xffffff) >>> 0).toString(16).padStart(6, '0');
-    rr(p.x - tw / 2 - u * 1.3, y - h / 2, u * 0.9, h, u * 0.45); hg.fill();
-    hg.fillStyle = bot ? '#c8c8d8' : '#fff';
-    hg.fillText(name, p.x + u * 0.2, y + 1, u * 30);
-  }
-  // damage numbers pop out of the monster
-  const mt = view.monsterTop && view.monsterTop();
-  for (let i = dmgNums.length - 1; i >= 0; i--) {
-    const d = dmgNums[i], k = (now - d.t0) / 0.8;
-    if (k >= 1 || k < 0 || !mt) { dmgNums.splice(i, 1); continue; }
-    const pop = 1 + 0.9 * Math.pow(Math.max(0, 1 - k * 4), 2);
-    const size = u * (d.c ? 6.4 : 4.2) * pop;
-    hg.font = F(900, size); hg.globalAlpha = Math.min(1, (1 - k) * 2.2);
-    const x = mt.x + d.j * u * 9, y = mt.y + u * 6 - k * u * 10;
-    const t = d.c ? d.v + '!' : String(d.v);
-    hg.lineWidth = size * 0.18; hg.strokeStyle = 'rgba(40,0,40,0.85)'; hg.strokeText(t, x, y);
-    hg.fillStyle = d.c ? '#ffe03a' : '#ffffff'; hg.fillText(t, x, y);
+    hg.fillText(name, p.x, y + 1, u * 22);
   }
   hg.globalAlpha = 1;
 }
+// top-centre ring: the arc is time left in this phase, the outer amber arc is lantern oil; the centre is an icon
+// (or the last-five-seconds countdown). A thin bar under it is the monster's health.
+function drawRing(now, u) {
+  const w = world, ph = w.phase;
+  if (ph !== ringPhase) { ringPhase = ph; ringMax[ph] = Math.max(1, w.tl || 1); }
+  if (w.tl > ringMax[ph]) ringMax[ph] = w.tl;
+  const cx = cssW / 2, cy = cssH * 0.135, r = u * 4.6;
+  const timed = ['gather', 'vote', 'monster', 'boss', 'riddle'].includes(ph) && w.tl > 0;
+  const k = timed ? Math.max(0, Math.min(1, w.tl / (ringMax[ph] || 1))) : 1;
+  const fuel = Math.max(0, Math.min(100, w.fuel || 0)) / 100;
+  const urgent = timed && (ph === 'vote' || ph === 'gather') && w.tl <= 5 && !(ph === 'gather' && w.n < 1);
+  const fight = (ph === 'monster' || ph === 'boss') && w.mo;
+  const col = fight ? '#ff6b8b' : ph === 'riddle' ? '#c77dff' : ph === 'vote' ? '#ffd36a' : '#7ee0ff';
+  const pulse = urgent ? 1 + 0.12 * Math.max(0, Math.sin((w.tl % 1) * Math.PI)) : 1;
+  hg.save(); hg.translate(cx, cy); hg.scale(pulse, pulse);
+  hg.fillStyle = 'rgba(10,6,24,0.55)'; hg.beginPath(); hg.arc(0, 0, r + u * 2.1, 0, Math.PI * 2); hg.fill();
+  hg.lineCap = 'round';
+  hg.lineWidth = u * 1.1;
+  hg.strokeStyle = 'rgba(255,255,255,0.16)'; hg.beginPath(); hg.arc(0, 0, r, 0, Math.PI * 2); hg.stroke();
+  hg.strokeStyle = col; hg.beginPath(); hg.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); hg.stroke();
+  // lantern oil (flickers red when low)
+  const low = fuel < 0.25 && ph !== 'gather' && ph !== 'end';
+  hg.lineWidth = u * 0.7;
+  hg.strokeStyle = 'rgba(255,180,90,0.18)'; hg.beginPath(); hg.arc(0, 0, r + u * 1.35, 0, Math.PI * 2); hg.stroke();
+  hg.strokeStyle = low ? (Math.sin(now * 10) > 0 ? '#ff4a4a' : '#ffb36b') : '#ffb36b';
+  if (fuel > 0) { hg.beginPath(); hg.arc(0, 0, r + u * 1.35, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fuel); hg.stroke(); }
+  hg.textAlign = 'center'; hg.textBaseline = 'middle'; hg.fillStyle = '#fff';
+  if (urgent) { hg.font = `900 ${Math.round(u * 4.4)}px -apple-system, "Segoe UI", Roboto, sans-serif`; hg.fillText(String(Math.ceil(w.tl)), 0, u * 0.3); }
+  else { hg.font = `${Math.round(u * 4)}px sans-serif`; hg.fillText(ph === 'riddle' ? '❓' : fight ? (w.mo.b ? '👻' : w.mo.k === 'spider' ? '🕷️' : w.mo.k === 'mimic' ? '📦' : '👻') : ph === 'end' ? '👑' : '🏮', 0, u * 0.3); }
+  hg.restore();
+  // shields: one small icon per charge beside the ring
+  if (w.sh) { hg.font = `${Math.round(u * 3.2)}px sans-serif`; for (let i = 0; i < Math.min(3, w.sh); i++) hg.fillText('🛡️', cx + r + u * (5 + i * 3.6), cy); }
+  if (fight) {
+    const bw = u * 26, f2 = Math.max(0, Math.min(1, w.mo.hp / w.mo.max)), y = cy + r + u * 4;
+    hg.fillStyle = 'rgba(10,6,24,0.6)'; rr(cx - bw / 2, y, bw, u * 1.4, u * 0.7); hg.fill();
+    hg.fillStyle = w.mo.b ? '#c77dff' : '#ff4a6a'; if (f2 > 0) { rr(cx - bw / 2, y, bw * f2, u * 1.4, u * 0.7); hg.fill(); }
+  }
+}
 function rr(x, y, w, h, r) { hg.beginPath(); hg.moveTo(x + r, y); hg.arcTo(x + w, y, x + w, y + h, r); hg.arcTo(x + w, y + h, x, y + h, r); hg.arcTo(x, y + h, x, y, r); hg.arcTo(x, y, x + w, y, r); hg.closePath(); }
 
-// ------------------------------------------------------------------ DOM HUD (4x a second)
-const themeName = (w) => (w.th === -2 ? BOSS_THEME.name : w.th === -1 ? GATE_THEME.name : (THEMES[w.th] || GATE_THEME).name);
+// ------------------------------------------------------------------ DOM HUD (4x a second): sounds + body classes only
 let lastCount = -1;
-function setText(id, t) { const el = $(id); if (el.__t !== t) { el.__t = t; el.textContent = t; } }
 function domHud(now) {
   const w = world, body = document.body;
   const fight = w.phase === 'monster' || w.phase === 'boss', rid = w.phase === 'riddle' && w.ri >= 0;
-  // how-to banner follows the phase
-  let title = '❤️ LIKES = LANTERN OIL', cls = '', chips = ['🚪 vote doors 1 · 2 · 3', '❓ answer riddles', '🎁 gifts = powers'];
-  if (w.phase === 'gather' || w.phase === 'end') { title = '🏮 COMMENT TO JOIN!'; chips = ['🚪 vote doors 1 · 2 · 3', '❤️ likes = lantern oil', '➕ follow = spare life']; }
-  else if (w.phase === 'vote' || w.phase === 'enter') { title = w.nd === 2 ? '🚪 COMMENT 1 OR 2!' : '🚪 COMMENT 1 · 2 · 3!'; cls = 'vote'; chips = ['🔮 any gift = safe door', '🛡️ 5🪙 = shield']; }
-  else if (fight) { title = w.phase === 'boss' ? '👻 BOSS! SPAM CHAT!' : '⚔️ SPAM CHAT TO HIT!'; cls = 'fight'; chips = ['💬 every comment = a hit', '❤️ likes hit too', '🎁 gifts = huge hits']; }
-  else if (rid) { title = '❓ ANSWER IN CHAT!'; cls = 'riddle'; chips = ['🏆 first right answer wins']; }
-  const ck = chips.join('|'); if ($('howChips').__k !== ck) { $('howChips').__k = ck; $('howChips').innerHTML = chips.map((c) => `<span>${esc(c)}</span>`).join(''); }
-  setText('howTitle', title); $('howTitle').className = 'title' + (cls ? ' ' + cls : '');
-  // pill
-  let txt;
-  const fl = w.floor ? `FLOOR ${w.floor}` : 'THE GATE';
-  if (w.phase === 'gather') txt = `🏮 CLIMB #${w.run + 1} IN ${Math.ceil(w.tl)}s · ${w.n} climbers`;
-  else if (w.phase === 'end') txt = `🏰 CLIMB OVER · ${fl}${w.best ? ' · best ' + w.best : ''}`;
-  else if (w.phase === 'climb') txt = `🪜 CLIMBING${w.lift ? ' · MIRA\'S LIFT ✨' : '…'} · 👥 ${w.n}`;
-  else txt = `${fl} · ${themeName(w).toUpperCase()}${['vote', 'monster', 'boss', 'riddle'].includes(w.phase) ? ` · ⏳${Math.ceil(w.tl)}s` : ''} · 👥 ${w.n}${w.gh ? ' 👻 ' + w.gh : ''}`;
-  setText('pillTxt', txt);
-  $('pill').className = w.phase === 'boss' || w.th === -2 ? 'boss' : w.phase === 'end' ? 'end' : w.phase;
-  // lantern oil
   const fuel = Math.max(0, Math.min(100, w.fuel));
-  $('fuelBar').style.width = fuel.toFixed(1) + '%'; setText('fuelN', Math.round(fuel) + '%');
-  setText('shields', w.sh ? '🛡️×' + w.sh : '');
-  $('fuel').className = fuel < 25 && w.phase !== 'gather' && w.phase !== 'end' ? 'low' : '';
   body.classList.toggle('dark', fuel < 20 && w.phase !== 'gather');
-  // boss / monster bar
-  const bb = $('bossbar'); bb.hidden = !(fight && w.mo);
-  if (!bb.hidden) { setText('bossName', `${w.mo.b ? '👻' : w.mo.k === 'spider' ? '🕷️' : w.mo.k === 'mimic' ? '📦' : '👻'} ${w.mo.n.toUpperCase()} · ${Math.max(0, Math.ceil(w.mo.hp))}`); $('bossHp').style.width = Math.max(0, (w.mo.hp / w.mo.max) * 100).toFixed(1) + '%'; }
-  // riddle card
-  const rc = $('riddle'); rc.hidden = !rid;
-  if (rid) {
-    setText('riddleQ', RIDDLES[w.ri] ? RIDDLES[w.ri][0] : '');
-    const s = solved || (w.rs ? { id: w.rs > 0 ? w.rs : 0, a: RIDDLES[w.ri][1][0] } : null);
-    rc.classList.toggle('solved', !!(s && s.id));
-    setText('riddleA', s ? (s.id ? `✅ ${nameOf(s.id)}: ${s.a.toUpperCase()}` : `❌ It was: ${s.a.toUpperCase()}`) : `✍️ First to comment the answer wins! ⏳${Math.ceil(w.tl)}s`);
-  }
   body.classList.toggle('voting', ['enter', 'vote', 'reveal'].includes(w.phase));
   body.classList.toggle('fighting', fight && !!w.mo); body.classList.toggle('riddling', rid);
-  // likes
-  setText('likeN', String(w.hype || 0)); $('likeBar').style.width = Math.min(100, ((w.hype || 0) / 300) * 100) + '%';
-  // big countdown: the last 5 s of a vote (with heartbeats) and of the gathering
-  const c = $('count');
+  // countdown sounds for the last 5 s of a vote (heartbeats) and of the gathering; the ring shows the number
   if ((w.phase === 'vote' || w.phase === 'gather') && w.tl <= 5.0 && w.tl > 0 && !(w.phase === 'gather' && w.n < 1)) {
     const n = Math.ceil(w.tl);
-    if (n !== lastCount) { lastCount = n; c.hidden = false; c.textContent = n; c.classList.remove('tick'); void c.offsetWidth; c.classList.add('tick'); audio.sfx(w.phase === 'vote' && n <= 3 ? 'heart' : 'beep'); }
-  } else { if (!c.hidden) c.hidden = true; lastCount = -1; }
+    if (n !== lastCount) { lastCount = n; audio.sfx(w.phase === 'vote' && n <= 3 ? 'heart' : 'beep'); }
+  } else lastCount = -1;
   if (w.phase !== 'end') $('winner').hidden = true;
-  renderBoard(now);
 }
 
 // ------------------------------------------------------------------ timers that follow the virtual clock in render mode
 const timers = [];
 function later(fn, ms) { if (!RENDER) return setTimeout(fn, ms); const t = { at: vclock + ms / 1000, fn }; timers.push(t); return t; }
 function runTimers() { for (let i = timers.length - 1; i >= 0; i--) if (timers[i].at <= vclock) { const t = timers.splice(i, 1)[0]; t.fn(); } }
-function showNotice(t) { const n = $('notice'); n.textContent = t; n.hidden = false; }
+function showNotice() { $('notice').hidden = false; }   // a small spinner icon, no words
 function hideNotice() { $('notice').hidden = true; }
 
 // ------------------------------------------------------------------ main loop + auto quality
@@ -517,6 +460,7 @@ if (RENDER) {
   window.__render = {
     async frame(dt) {
       vclock += dt; runTimers();
+      if (view && view.ready && !view.loaded && !view.error) await view.ready.catch(() => {});
       for (let i = 0; i < 100 && (pumpLocalSay.busy || (sayQ.length && sayQ[0].p && sayPending)); i++) await new Promise((r) => setTimeout(r, 30));
       tick(dt, vclock);
       return { phase: world.phase, n: world.n, floor: world.floor, fuel: world.fuel };
@@ -540,7 +484,7 @@ function maybeTikFinity(t) {
 let diag = null;
 makeView();
 resize();
-renderGifts();
+
 if (LOCAL) { startLocal(); board = { session: [], all: [] }; } else connect();
 if (!RENDER) {
   requestAnimationFrame(loop);

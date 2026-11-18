@@ -1,5 +1,6 @@
 // Mystic Mira narrates the Haunted Tower: events -> short spoken lines (+ an optional big banner word).
-// Shared by the server (LIVE) and the overlay's local/demo mode. Priorities let the voice skip stale chatter.
+// Nothing is written on screen any more, so the voice also explains how to play and what each gift does (rotating
+// tips in quiet moments). Shared by the server (LIVE) and the overlay's local/demo mode. Priorities let the voice skip stale chatter.
 import { THEMES, BOSS_THEME, RIDDLES } from './tower-data.js';
 const pick = (arr, rng) => arr[Math.floor(rng() * arr.length) % arr.length];
 const NUM = ['one', 'two', 'three'];
@@ -17,12 +18,28 @@ const INTRO = {
 export function makeTowerLines({ nameOf, rng = Math.random }) {
   const joins = []; let joinAt = 0;
   const L = (text, pri, banner, extra = {}) => ({ text, pri, banner: banner || null, ...extra });
+  const TIPS = {
+    gather: [
+      'To play, just comment anything. You get a lantern and climb with the party.',
+      'On every floor, comment a door number to vote. One, two or three. Choose wisely!',
+      'Gifts are magic! Any small gift, like a rose, shows the safe door. Five coins casts a shield.',
+      'Thirty coins rescues the fallen. One hundred coins calls my lift. Five hundred coins summons a ghost boss!',
+      'Tap the screen! Likes are lantern oil. If the oil runs out, the climb is over.',
+      'Follow for a spare life. Share the live for a spare life and more oil.',
+    ],
+    vote: ['Comment the number of a door to vote!', 'Send any gift and I will show you the safe door.', 'Shields block traps. Five coins!'],
+    fight: ['Every comment is a hit! Spam the chat!', 'Likes hurt it too! Tap, tap, tap!', 'Gifts hit hardest of all!'],
+  };
+  let phase = 'gather', lastSaid = -99, tipAt = 0; const tipN = { gather: 0, vote: 0, fight: 0 };
+  const QUIET = { gather: [5, 7], vote: [3.5, 7], fight: [5, 9] };
   const list = (ids) => { const n = ids.map(nameOf).filter(Boolean); if (!n.length) return ''; const s = n.slice(0, 3); const more = n.length - s.length; return (s.length === 1 ? s[0] : s.slice(0, -1).join(', ') + ' and ' + s[s.length - 1]) + (more > 0 ? ` and ${more} more` : ''); };
   return {
     lines(events, t) {
       const out = [];
       for (const e of events) {
         const N = e.id ? nameOf(e.id) : null;
+        const ph = { gather: 'gather', end: 'gather', vote: e.start ? 'vote' : null, reveal: 'other', monster: 'fight', mwin: 'other', mlose: 'other', riddle: 'other', climb: 'other' }[e.k];
+        if (ph) phase = ph;
         switch (e.k) {
           case 'gather': out.push(L(pick(['Gather, climbers! Comment anything to take a lantern. The tower is waiting.', 'A new climb begins. Comment to join the party, my darlings.'], rng), 6, 'NEW CLIMB')); break;
           case 'floor': {
@@ -96,6 +113,9 @@ export function makeTowerLines({ nameOf, rng = Math.random }) {
         const ids = joins.splice(0, 60);
         out.push(L(pick([`Welcome ${list(ids)}. Take a lantern.`, `${list(ids)} joined the climb.`], rng), 2));
       }
+      if (out.length) lastSaid = t;
+      const tl = TIPS[phase], q = QUIET[phase];
+      if (tl && !out.length && t - lastSaid > q[0] && t - tipAt > q[1]) { tipAt = t; lastSaid = t; out.push(L(tl[tipN[phase]++ % tl.length], 2, null, { tip: 1 })); }
       return out;
     },
   };

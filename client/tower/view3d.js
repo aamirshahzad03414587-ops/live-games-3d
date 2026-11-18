@@ -1,9 +1,10 @@
 // Mira's Haunted Tower, 3D view (Three.js), iPhone Safari first:
 // - one room at a time (two while climbing): procedural canvas textures, instanced props, no real-time shadows
 // - one flickering point light (the candles), hemisphere fill, fog that thickens as the lantern oil runs low
-// - instanced chibi climbers carrying lanterns, ghosts for the fallen, a billboard Mystic Mira
+// - rigged, animated CC0 KayKit adventurers carrying lanterns (pooled actors, shared clips), spectral copies for the
+//   fallen, KayKit skeleton wraiths / boss, KayKit Dungeon + Halloween props (instanced per room), a billboard Mystic Mira
 // - fixed pools for particles / falling things; every geometry, material and texture is disposed with its room
-import {
+import { DirectionalLight,
   WebGLRenderer, Scene, PerspectiveCamera, Color, Fog, HemisphereLight, PointLight, AmbientLight,
   Mesh, InstancedMesh, Points, Group, BufferGeometry, BufferAttribute, CylinderGeometry, CircleGeometry, SphereGeometry,
   CapsuleGeometry, BoxGeometry, PlaneGeometry, RingGeometry, TorusGeometry, ConeGeometry, LatheGeometry,
@@ -13,6 +14,11 @@ import {
 } from 'three';
 import { THEMES, BOSS_THEME, GATE_THEME, FH, DOOR_Z, doorX, STAIR } from '../../public/shared/tower-data.js';
 import { TFLAG } from '../../public/shared/tower-sim.js';
+import { loadKit, tickActor } from '../shared/kaykit.js';
+import { loadEnv } from '../shared/envkit.js';
+
+const HEROES = ['Knight', 'Barbarian', 'Mage', 'Rogue', 'Rogue_Hooded'];
+const CSCALE = 0.86;   // climbers ~1.5 m next to 2.8 m dungeon doorways
 
 const TAU = Math.PI * 2;
 const SKIN = [0xffd9b8, 0xf1c08f, 0xd9a066, 0xa86b45, 0x7a4a2c, 0xffe3cf];
@@ -24,7 +30,7 @@ export function createTowerView(canvas, opts = {}) {
   const renderer = new WebGLRenderer({ canvas, antialias: !!opts.aa, alpha: false, depth: true, stencil: false, powerPreference: 'default', preserveDrawingBuffer: !!opts.preserve, failIfMajorPerformanceCaveat: false });
   if (!renderer.getContext()) throw new Error('no webgl');
   renderer.outputColorSpace = SRGBColorSpace;
-  renderer.toneMapping = ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+  renderer.toneMapping = ACESFilmicToneMapping; renderer.toneMappingExposure = 1.2;
   renderer.shadowMap.enabled = false;
 
   const scene = new Scene();
@@ -38,8 +44,21 @@ export function createTowerView(canvas, opts = {}) {
   const hemi = new HemisphereLight(0xb9a6ff, 0x3a2030, 1.15); scene.add(hemi);
   const amb = new AmbientLight(0x6a5a8a, 0.35); scene.add(amb);
   const candle = new PointLight(0xffb36b, 30, 26, 1.6); scene.add(candle);
+  // one soft key light from the camera side so the climbers read clearly in the gloom (follows the current floor)
+  const key = new DirectionalLight(0xffd9b0, 1.1); key.position.set(3, 12, 14); scene.add(key); scene.add(key.target);
   const ramp = keep(new DataTexture(new Uint8Array([80, 165, 255]), 3, 1, RedFormat)); ramp.minFilter = ramp.magFilter = NearestFilter; ramp.needsUpdate = true;
   const toonG = (color, extra = {}) => keep(new MeshToonMaterial({ color, gradientMap: ramp, ...extra }));
+
+  // ------------------------------------------------------------------ CC0 KayKit models (stream in; rooms are rebuilt with props once loaded)
+  let kit = null, env = null, disposed = false, loadErr = null;
+  const ready = Promise.all([loadEnv(opts.envUrl || '/models/env-tower.glb'), loadKit({ names: HEROES.concat(['Skeleton_Mage', 'Skeleton_Warrior']) })])
+    .then(([e, k]) => {
+      if (disposed) { e.dispose(); k.dispose(); return; }
+      env = e; kit = k;
+      for (const r of rooms.values()) disposeRoom(r); rooms.clear();
+      upgradeModels();
+    }).catch((err) => { loadErr = err; throw err; });
+  ready.catch(() => {});
 
   // ------------------------------------------------------------------ procedural textures
   function canvasTex(w, h, draw, list = global, { mip = true, repeat = null } = {}) {
@@ -149,23 +168,33 @@ export function createTowerView(canvas, opts = {}) {
     // candles (flames are glow points, drawn with the halos)
     const flames = [], cps = [];
     for (let i = 0; i < 10; i++) { const a = -Math.PI * 0.95 + (i / 9) * Math.PI * 1.9 + Math.PI / 2, r = RW - 1.2, x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.hypot(x - STAIR.x, z - STAIR.z) < 2.6 || z > 3) continue; cps.push([x, z, 0.5 + (i % 3) * 0.35]); }
-    const cm = inst(G.cyl, mat({ color: 0xf3ead2, emissive: 0x3a2a10 }), cps.length);
-    const st = inst(G.cyl6, mat({ color: 0x6a4a2a }), cps.length);
-    cps.forEach(([x, z, h], i) => { put(cm, i, x, h / 2 + 0.6, z, 0.22, h, 0.22); put(st, i, x, 0.3, z, 0.5, 0.6, 0.5); flames.push([x, h + 0.75, z]); });
+    if (env) {
+      const lit = [], tri = [];
+      cps.forEach(([x, z, h], i) => { if (i % 3 === 1) { tri.push({ x, z, ry: rnd() * TAU, s: 1.1 }); flames.push([x, 0.95, z]); } else { lit.push({ x, z, ry: rnd() * TAU, s: 0.9 + h * 0.4 }); flames.push([x, (0.9 + h * 0.4) * 1.0, z]); } });
+      for (const [n, it] of [['candle_lit', lit], ['candle_triple', tri]]) { const m = env.instanced(n, it); if (m) add(m); }
+    } else {
+      const cm = inst(G.cyl, mat({ color: 0xf3ead2, emissive: 0x3a2a10 }), cps.length);
+      const st = inst(G.cyl6, mat({ color: 0x6a4a2a }), cps.length);
+      cps.forEach(([x, z, h], i) => { put(cm, i, x, h / 2 + 0.6, z, 0.22, h, 0.22); put(st, i, x, 0.3, z, 0.5, 0.6, 0.5); flames.push([x, h + 0.75, z]); });
+    }
     const anim = [];
     const r = { fi, th, id, grp, list, doors: [], flames, anim, nd, extra: {} };
     // doors: frames, dark doorway, coloured glow, hinged panel, number plaque
     if (nd) {
       const xs = doorX(nd);
-      const frame = inst(G.box, mat({ color: 0x3a3040 }), nd * 3);
+      // KayKit dungeon doorways (stone wall + arch) when loaded, else simple frames
+      const DH = env ? 2.8 : 4.0, DW = 2.0;
+      if (env) { const f = env.instanced('wall_doorway', xs.map((x) => ({ x, y: 0, z: DOOR_Z - 0.1, s: 1 }))); if (f) add(f); }
+      else { const frame = inst(G.box, mat({ color: 0x3a3040 }), nd * 3); xs.forEach((x, i) => { put(frame, i * 3, x - 1.2, 2.0, DOOR_Z, 0.45, 4.2, 0.7); put(frame, i * 3 + 1, x + 1.2, 2.0, DOOR_Z, 0.45, 4.2, 0.7); put(frame, i * 3 + 2, x, 4.2, DOOR_Z, 2.9, 0.55, 0.75); }); }
       xs.forEach((x, i) => {
-        put(frame, i * 3, x - 1.2, 2.0, DOOR_Z, 0.45, 4.2, 0.7); put(frame, i * 3 + 1, x + 1.2, 2.0, DOOR_Z, 0.45, 4.2, 0.7); put(frame, i * 3 + 2, x, 4.2, DOOR_Z, 2.9, 0.55, 0.75);
-        const dark = add(new Mesh(G.plane, basic({ color: 0x050208 }))); dark.position.set(x, 2.0, DOOR_Z - 0.05); dark.scale.set(2.0, 4.0, 1);
-        const glow = add(new Mesh(G.plane, basic({ color: 0x000000, transparent: true, blending: AdditiveBlending, depthWrite: false }))); glow.position.set(x, 2.0, DOOR_Z - 0.02); glow.scale.set(2.0, 4.0, 1);
+        const dark = add(new Mesh(G.plane, basic({ color: 0x050208 }))); dark.position.set(x, DH / 2, DOOR_Z - 0.12); dark.scale.set(DW, DH, 1);
+        const glow = add(new Mesh(G.plane, basic({ color: 0x000000, transparent: true, blending: AdditiveBlending, depthWrite: false }))); glow.position.set(x, DH / 2, DOOR_Z - 0.08); glow.scale.set(DW, DH, 1);
         const pivot = add(new Object3D()); pivot.position.set(x - 0.98, 0, DOOR_Z + 0.08);
-        const panel = new Mesh(G.box, mat({ map: doorTex })); panel.scale.set(1.95, 3.95, 0.16); panel.position.set(0.975, 1.98, 0); pivot.add(panel);
-        const plaque = add(new Mesh(G.plane, basic({ map: digitTex[i], transparent: true }))); plaque.position.set(x, 5.05, DOOR_Z + 0.42); plaque.scale.set(1.25, 1.25, 1);
-        r.doors.push({ x, pivot, glow, plaque, open: 0 });
+        if (env && env.has('wall_doorway_door')) { const panel = new Mesh(env.geos.get('wall_doorway_door'), env.matOf('wall_doorway_door')); panel.position.set(1.0, 0, -0.1); pivot.add(panel); }
+        else { const panel = new Mesh(G.box, mat({ map: doorTex })); panel.scale.set(1.95, 3.95, 0.16); panel.position.set(0.975, 1.98, 0); pivot.add(panel); }
+        // the door number is the one piece of writing kept on screen (viewers vote by typing it)
+        const plaque = add(new Mesh(G.plane, basic({ map: digitTex[i], transparent: true }))); plaque.position.set(x, DH + 1.35, DOOR_Z + 0.42); plaque.scale.set(1.25, 1.25, 1);
+        r.doors.push({ x, pivot, glow, plaque, open: 0, top: DH + 2.2 });
       });
     }
     // ---------- theme props
@@ -232,9 +261,29 @@ export function createTowerView(canvas, opts = {}) {
       r.extra.win = win;
     }
     if (id === 'attic' || id === 'mirror' || id === 'crypt') { const w = inst(G.plane, basic({ color: 0x6a7ab4 }), 1); put(w, 0, -9.3, 5.2, -3.0, 1.8, 2.8, 1, Math.PI / 2); r.extra.win = w; }
+    if (env) kitProps(id, add, r);
     grp.traverse((o) => { if (o.isInstancedMesh) { o.instanceMatrix.needsUpdate = true; if (o.instanceColor) o.instanceColor.needsUpdate = true; o.frustumCulled = false; } });
     scene.add(grp);
     return r;
+  }
+  // KayKit dungeon / Halloween dressing per room (one InstancedMesh per prop type; geometry shared, never disposed per room)
+  const L = Math.PI / 2;
+  const PROPS = {
+    all: [['torch_mounted', -9.55, -3.2, L, 1, 3.2], ['torch_mounted', -9.55, 2.4, L, 1, 3.2], ['torch_mounted', 9.6, 1.0, -L, 1, 3.2]],
+    gate: [['banner_patternA_red', -6.7, DOOR_Z + 0.05, 0, 1, 2.6], ['banner_patternA_red', 6.7, DOOR_Z + 0.05, 0, 1, 2.6], ['lantern_standing', -7.4, 3.8, 0, 1.3], ['barrel_large', -8.0, -1.0, 0.3, 0.75], ['crates_stacked', 8.1, 4.4, 0.4, 0.8], ['pumpkin_orange_jackolantern', -6.6, 5.6, 0.6, 0.9]],
+    library: [['table_medium_decorated_A', -7.2, 2.2, 0.2, 0.9], ['chair', -6.1, 3.4, 2.4, 0.9], ['lantern_standing', 7.9, 4.6, 0, 1.3], ['banner_thin_green', -3.4, DOOR_Z + 0.05, 0, 1, 2.8], ['banner_thin_green', 3.4, DOOR_Z + 0.05, 0, 1, 2.8], ['shelf_small_candles', -9.4, -0.5, L, 1, 2.4]],
+    crypt: [['coffin_decorated', -7.6, -0.6, L, 0.95], ['coffin', -7.0, 3.6, L - 0.4, 0.95], ['coffin_lid', -7.0, 3.6, L - 0.4, 0.95], ['skull_candle', -5.8, -5.7, 0.4, 1], ['gravestone', 3.0, -5.8, 0, 1], ['gravestone', -3.1, -6.0, 0.15, 0.9], ['ribcage', 7.6, 5.2, 0.8, 1.2], ['bone_A', -3.8, 5.6, 1.1, 1.2], ['bone_A', 4.6, 6.0, 2.2, 1.2], ['shrine_candles', 8.3, 3.6, -L, 1]],
+    mirror: [['candle_triple', -7.8, 0.4, 0, 1.2], ['candle_triple', 8.2, 4.4, 0, 1.2], ['banner_thin_green', -3.4, DOOR_Z + 0.05, 0, 1, 2.8], ['banner_thin_green', 3.4, DOOR_Z + 0.05, 0, 1, 2.8]],
+    clock: [['crates_stacked', -7.9, 3.4, 0.3, 0.85], ['barrel_small_stack', 8.2, 4.4, -0.6, 0.85], ['keg_decorated', -7.2, -4.6, 0.8, 0.8], ['sword_shield', 9.6, 4.2, -L, 1, 3.0]],
+    attic: [['box_stacked', -7.4, -4.4, 0.4, 0.75], ['barrel_large', 8.2, 4.6, 0, 0.8], ['pumpkin_orange_jackolantern', -6.2, 5.4, 0.6, 0.9], ['pumpkin_yellow_small', -5.4, 6.0, 0.2, 1.2], ['crates_stacked', 7.0, -5.8, -0.4, 0.8]],
+    lab: [['keg_decorated', 8.0, 4.6, -0.5, 0.8], ['bottle_A_green', -7.6, -1.2, 0, 0.9, 1.0], ['bottle_B_brown', -7.4, 0.8, 0, 0.9, 1.0], ['shelf_small_candles', 9.6, 2.6, -L, 1, 2.4], ['skull', 7.2, 6.0, -0.8, 0.8]],
+    ballroom: [['banner_triple_yellow', 0, DOOR_Z - 0.1, 0, 1, 4.4], ['bench_decorated', -7.8, 1.4, L, 1], ['bench_decorated', 8.2, 4.4, -L, 1], ['candle_triple', -7.6, -4.6, 0, 1.3]],
+    belfry: [['banner_patternB_blue', -6.6, DOOR_Z + 0.05, 0, 1, 2.6], ['banner_patternB_blue', 6.6, DOOR_Z + 0.05, 0, 1, 2.6], ['skull_candle', -7.6, 2.6, 0.8, 1.1], ['lantern_standing', 7.8, 4.8, 0, 1.3], ['post_skull', -6.6, 5.4, 0.6, 1], ['post_skull_skull', -6.6, 5.4, 0.6, 1]],
+  };
+  function kitProps(id, add, r) {
+    const by = {};
+    for (const [n, x, z, ry, sc = 1, y = 0] of PROPS.all.concat(PROPS[id] || [])) (by[n] || (by[n] = [])).push({ x, y, z, ry, s: sc });
+    for (const [n, items] of Object.entries(by)) { const m = env.instanced(n, items); if (m) { add(m); if (n === 'torch_mounted') for (const it of items) r.flames.push([it.x + Math.sin(it.ry) * 0.45, it.y + 0.75, it.z + Math.cos(it.ry) * 0.45]); } }
   }
   function disposeRoom(r) { scene.remove(r.grp); for (const x of r.list) x.dispose(); r.grp.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); }
   function ensureRoom(fi, th, nd) {
@@ -300,6 +349,15 @@ export function createTowerView(canvas, opts = {}) {
     const crown = new Mesh(keep(new CylinderGeometry(0.62, 0.5, 0.5, 6, 1, true)), toonG(0xffd34d, { emissive: 0x6a4a00, side: DoubleSide })); crown.position.set(0, 3.15, 0); g.add(crown);
     g.userData = { mouth, crown };
     M_.ghost = g; monster.add(g);
+  }
+  // once the KayKit models stream in: wraiths are spectral skeleton mages, the boss a crowned giant skeleton warrior
+  let wraith = null, bossA = null;
+  function upgradeModels() {
+    const g = M_.ghost;
+    for (const c of [...g.children]) if (c !== g.userData.crown) c.visible = false;
+    wraith = kit.actor('Skeleton_Mage', 'ghost'); wraith.obj.scale.setScalar(1.35); g.add(wraith.obj);
+    bossA = kit.actor('Skeleton_Warrior', 'ghost-boss'); bossA.obj.scale.setScalar(1.45); g.add(bossA.obj);
+    g.userData.crown.scale.setScalar(0.75);
   }
   { // spider
     const g = new Group(); const mm = toonG(0x2a1a2a, { emissive: 0x100008 }); hitMats.push(mm);
@@ -416,6 +474,43 @@ export function createTowerView(canvas, opts = {}) {
   let monVis = { kind: '', t0: 0, hitT: -9, atkT: -9, dieT: -9, x: 0, z: -4 };
   let chestT = -9, chestX = 0, bladeT = -9;
   const drawn = [];   // label anchors for the HUD: { id, x, y, z, info, flags, ghost }
+  const hashId = (n) => { n = (n ^ 61) ^ (n >>> 16); n = (n + (n << 3)) | 0; n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
+  let frameNo = 0;
+  const HV = new Vector3();
+  function actorClimbers(list, now, dt, halos, fuel, w) {
+    let n = 0, cx = 0, cz = 0, cn = 0;
+    const lod = quality.animLod || 1, crowd = list.length > 24;
+    const battle = w.phase === 'monster' || w.phase === 'boss';
+    const happy = w.phase === 'treasure' || w.phase === 'victory';
+    for (const m of list) {
+      const s = vstate(m, now); s.seen = now; s.frame = frameNo;
+      const sp = Math.hypot(m.x - s.x, m.z - s.z) / Math.max(dt, 1e-3);
+      s.speed = (s.speed || 0) + (Math.min(sp, 10) - (s.speed || 0)) * Math.min(1, dt * 8);
+      s.x = m.x; s.y = m.y; s.z = m.z;
+      const info = m.info || {};
+      if (!s.a) { s.model = s.model || HEROES[hashId(m.id) % HEROES.length]; s.a = kit.actor(s.model, m.flags & TFLAG.bot ? null : (info.color ?? null)); scene.add(s.a.obj); s.acc = 0; }
+      const a = s.a, pa = Math.min(1, (now - s.spawn) / 0.35);
+      const climbing = m.flags & 2048;
+      a.obj.position.set(m.x, baseY + m.y, m.z); a.obj.rotation.set(0, m.face, 0); a.obj.scale.setScalar(CSCALE * (0.4 + 0.6 * pa));
+      const base = climbing || s.speed > 2.4 ? 'run' : s.speed > 0.4 ? 'walk' : m.flags & TFLAG.cmd ? 'cheer' : happy ? 'cheer' : battle ? 'combat' : 'idle';
+      a.play(base, now);
+      if (now - s.hit < 0.05 && now >= a.until) a.play(s.model === 'Mage' ? 'cast' : s.model.startsWith('Rogue') ? 'shoot' : 'slash', now, { speed: 1.4 });
+      s.acc += dt;
+      const every = (crowd || Math.hypot(m.x, m.z - 2) > 7 ? 2 : 1) * lod;
+      if ((frameNo + m.id) % every === 0) { tickActor(kit, a, s.acc, now); s.acc = 0; }
+      // lantern swings from the left hand slot (last frame's bone pose is plenty)
+      if (a.hand) { a.hand.getWorldPosition(HV); } else HV.set(m.x + 0.3, baseY + m.y + 0.5, m.z + 0.3);
+      L2.compose(V.set(HV.x, HV.y - 0.28, HV.z), Q.setFromEuler(E.set(Math.sin(now * 2 + m.id) * 0.15, m.face, 0)), S.set(0.75, 0.75, 0.75)); P.lantern.setMatrixAt(n, L2);
+      L2.compose(V.set(m.x, baseY + m.y + 0.02, m.z), Q.identity(), S.set(1.1, 1, 1.1)); P.shadow.setMatrixAt(n, L2);
+      if (quality.halos || n < 16) halos.push([HV.x, HV.y - 0.3, HV.z, 1, 0.7, 0.3, (0.35 + 0.65 * fuel) * (m.flags & TFLAG.gift ? 1.7 : 1), 1.5 + 1.5 * fuel]);
+      drawn.push({ id: m.id, x: m.x, y: baseY + m.y + 1.75 * CSCALE * pa + 0.2, z: m.z, info, flags: m.flags });
+      if (m.y < 0.5) { cx += m.x; cz += m.z; cn++; }
+      n++;
+    }
+    // members that left the drawn list (fell, over the cap) hand their actor back to the pool
+    for (const s of vis.values()) if (s.a && s.frame !== frameNo) { kit.release(s.a); s.a = null; }
+    return { n, cx, cz, cn };
+  }
   function vstate(m, now) {
     let s = vis.get(m.id);
     if (!s) { s = { walk: Math.random() * 10, hit: -9, spawn: now, skin: SKIN[m.id % SKIN.length], x: m.x, y: m.y, z: m.z, seen: now }; vis.set(m.id, s); }
@@ -424,7 +519,7 @@ export function createTowerView(canvas, opts = {}) {
   const doorPos = (r, i) => (r && r.doors[i] ? r.doors[i].x : 0);
 
   function frame(w, dt, now) {
-    lastW = w; time = now;
+    lastW = w; time = now; frameNo++;
     const T = themeOf(w.th);
     curFloor = w.floor; baseY = curFloor * FH;
     // rooms: the current one (+ the one above while climbing); the one below lingers 2.5 s, the rest are disposed
@@ -459,6 +554,7 @@ export function createTowerView(canvas, opts = {}) {
     const flick = 0.82 + 0.1 * Math.sin(now * 13.1) + 0.06 * Math.sin(now * 7.3 + 1.7) + 0.05 * Math.sin(now * 23.7);
     candle.color.copy(lightCol); candle.intensity = (18 + 26 * fuel) * flick * (now - flashT < 0.15 ? 2.5 : 1);
     candle.position.set(0, baseY + 4.2, 1.5);
+    key.position.set(3, baseY + 12, 14); key.target.position.set(0, baseY, 0); key.intensity = 0.55 + 0.6 * fuel;
     const bolt = now - lightning < 0.12 || (now - lightning > 0.22 && now - lightning < 0.3);
     hemi.intensity = 0.6 + 0.7 * fuel + (bolt ? 2.2 : 0);
     if (cur.extra.win && Math.random() < dt / 9) { lightning = now; thunderAt = now + 0.45; }
@@ -472,20 +568,20 @@ export function createTowerView(canvas, opts = {}) {
       tgtLook.set(STAIR.x - 1.2, baseY + 2.6 + up, STAIR.z);
     } else if (w.phase === 'reveal' && w.ch >= 0) {
       const dx = doorPos(cur, w.ch), e = k * k * (3 - 2 * k);
-      tgtPos.set(dx * 0.5, baseY + 7.6, 15 - e * 2.6); tgtLook.set(dx * 0.85, baseY + 2.4, DOOR_Z);
+      tgtPos.set(dx * 0.5, baseY + 5.6, 12.5 - e * 3.2); tgtLook.set(dx * 0.85, baseY + 1.8, DOOR_Z);
     } else if ((w.phase === 'treasure' || w.phase === 'trap') && w.ch >= 0) {
       const dx = doorPos(cur, w.ch);
-      tgtPos.set(dx * 0.35, baseY + 8.6, 16.5); tgtLook.set(dx * 0.6, baseY + 2.2, -4.2);
+      tgtPos.set(dx * 0.35, baseY + 6.4, 13.8); tgtLook.set(dx * 0.6, baseY + 1.8, -4.2);
     } else if (w.phase === 'monster' || w.phase === 'boss') {
       const b = w.phase === 'boss';
-      tgtPos.set(Math.sin(now * 0.25) * 1.4, baseY + (b ? 11.4 : 10.4), b ? 22 : 20.4); tgtLook.set(0, baseY + (b ? 3.6 : 2.8), -3);
+      tgtPos.set(Math.sin(now * 0.25) * 1.8, baseY + (b ? 8.6 : 7.0), b ? 17.5 : 15.2); tgtLook.set(0, baseY + (b ? 3.9 : 2.7), -3);
     } else if (w.phase === 'end') {
-      const a = now * 0.18; tgtPos.set(Math.sin(a) * 9, baseY + 6, 3 + Math.cos(a) * 9); tgtLook.set(0, baseY + 1.4, 2.4);
+      const a = now * 0.18; tgtPos.set(Math.sin(a) * 7, baseY + 4.4, 3 + Math.cos(a) * 7); tgtLook.set(0, baseY + 1.5, 2.4);
     } else if (w.phase === 'vote') {
       let lead = 0, mx = 0; (w.vc || []).forEach((v, i) => { if (v > mx) { mx = v; lead = i; } });
       const dx = mx ? doorPos(cur, lead) * 0.25 : 0;
-      tgtPos.set(dx * 0.6, baseY + 9.8, 19.4); tgtLook.set(dx, baseY + 2.7, -2.8);
-    } else { tgtPos.set(0, baseY + 10, 20); tgtLook.set(0, baseY + 2.6, -2.4); }
+      tgtPos.set(dx * 0.6, baseY + 7.2, 15.8); tgtLook.set(dx, baseY + 2.4, -3.4);
+    } else { const a = now * 0.12; tgtPos.set(Math.sin(a) * 2.2, baseY + 6.6 + Math.sin(a * 0.7) * 0.6, 15.2); tgtLook.set(0, baseY + 1.9, -2.2); }
     const ck = Math.min(1, dt * (w.phase === 'climb' ? 3.2 : 2.2));
     if (camPos.distanceTo(tgtPos) > 30) { camPos.copy(tgtPos); camLook.copy(tgtLook); }
     camPos.lerp(tgtPos, ck); camLook.lerp(tgtLook, ck);
@@ -515,7 +611,8 @@ export function createTowerView(canvas, opts = {}) {
     const list = w.members.length > Math.min(CAP, quality.maxChars || CAP) ? w.members.slice(0, Math.min(CAP, quality.maxChars || CAP)) : w.members;
     let n = 0, cx = 0, cz = 0, cn = 0;
     const set = (im, i, lx, ly, lz, sx2, sy2, sz2, rx = 0, rz = 0, col = null) => { L2.compose(V.set(lx, ly, lz), Q.setFromEuler(E.set(rx, 0, rz)), S.set(sx2, sy2, sz2)); M.multiplyMatrices(ROOT, L2); im.setMatrixAt(i, M); if (col) im.setColorAt(i, col); };
-    for (const m of list) {
+    if (kit) { const o = actorClimbers(list, now, dt, halos, fuel, w); n = o.n; cx = o.cx; cz = o.cz; cn = o.cn; }
+    else for (const m of list) {
       const s = vstate(m, now); s.seen = now;
       const sp = Math.hypot(m.x - s.x, m.z - s.z) / Math.max(dt, 1e-3);
       s.x = m.x; s.y = m.y; s.z = m.z;
@@ -545,7 +642,7 @@ export function createTowerView(canvas, opts = {}) {
       if (m.y < 0.5) { cx += m.x; cz += m.z; cn++; }
       n++;
     }
-    for (const key of Object.keys(P)) { const im = P[key]; im.count = key === 'eyes' || key === 'hands' || key === 'feet' ? n * 2 : n; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
+    for (const key of Object.keys(P)) { const im = P[key]; if (kit && key !== 'lantern' && key !== 'shadow') { im.count = 0; continue; } im.count = key === 'eyes' || key === 'hands' || key === 'feet' ? n * 2 : n; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
     // ghosts drift behind the party
     let gn = 0;
     for (const g of w.ghosts || []) {
@@ -557,14 +654,23 @@ export function createTowerView(canvas, opts = {}) {
       s.x += (tx - s.x) * Math.min(1, dt * 0.8); s.z += (tz - s.z) * Math.min(1, dt * 0.8);
       const rise = Math.min(1, (now - s.born) / 1.5);
       const gy = baseY + 0.6 + rise * 1.6 + Math.sin(now * 1.7 + s.ph) * 0.25;
-      ROOT.compose(V.set(s.x, gy, s.z), Q.setFromEuler(E.set(0, Math.sin(now + s.ph) * 0.4, Math.sin(now * 1.3 + s.ph) * 0.12)), S.set(0.7, 0.7, 0.7));
-      ghostM.setMatrixAt(gn, ROOT);
-      for (const sd of [0, 1]) { L2.compose(V.set(sd ? 0.13 : -0.13, 0.72, 0.4), Q.identity(), S.set(1, 1.3, 1)); M.multiplyMatrices(ROOT, L2); ghostEyes.setMatrixAt(gn * 2 + sd, M); }
+      if (kit) {
+        // the fallen: a see-through spectral copy of the same adventurer, floating behind the party
+        if (!s.a) { const v = vis.get(g.id); s.a = kit.actor(v?.model || HEROES[hashId(g.id) % HEROES.length], 'ghost'); s.a.play('idle', now); scene.add(s.a.obj); }
+        s.a.obj.position.set(s.x, gy - 0.8, s.z); s.a.obj.rotation.set(0, Math.sin(now + s.ph) * 0.4, Math.sin(now * 1.3 + s.ph) * 0.1); s.a.obj.scale.setScalar(CSCALE * 0.9 * (0.4 + 0.6 * rise));
+        s.acc = (s.acc || 0) + dt; if ((frameNo + g.id) % 3 === 0) { tickActor(kit, s.a, s.acc, now); s.acc = 0; }
+        s.drawnAt = frameNo;
+      } else {
+        ROOT.compose(V.set(s.x, gy, s.z), Q.setFromEuler(E.set(0, Math.sin(now + s.ph) * 0.4, Math.sin(now * 1.3 + s.ph) * 0.12)), S.set(0.7, 0.7, 0.7));
+        ghostM.setMatrixAt(gn, ROOT);
+        for (const sd of [0, 1]) { L2.compose(V.set(sd ? 0.13 : -0.13, 0.72, 0.4), Q.identity(), S.set(1, 1.3, 1)); M.multiplyMatrices(ROOT, L2); ghostEyes.setMatrixAt(gn * 2 + sd, M); }
+      }
       drawn.push({ id: g.id, x: s.x, y: gy + 0.9, z: s.z, info: g.info || {}, flags: g.flags, ghost: true });
       gn++;
     }
+    if (kit) { gn = 0; for (const [id, s] of ghostVis) if (s.a && s.drawnAt !== frameNo) { kit.release(s.a); s.a = null; } }
     ghostM.count = gn; ghostEyes.count = gn * 2; ghostM.instanceMatrix.needsUpdate = true; ghostEyes.instanceMatrix.needsUpdate = true;
-    if (Math.random() < 0.02) { for (const [id, s] of ghostVis) if (now - s.seen > 3) ghostVis.delete(id); for (const [id, s] of vis) if (now - s.seen > 5) vis.delete(id); }
+    if (Math.random() < 0.02) { for (const [id, s] of ghostVis) if (now - s.seen > 3) { if (s.a) kit.release(s.a); ghostVis.delete(id); } for (const [id, s] of vis) if (now - s.seen > 5) { if (s.a) kit.release(s.a); vis.delete(id); } }
     // shield dome over the party
     const want = (w.sh || 0) > 0, du = dome.material.uniforms;
     du.a.value += ((want ? (['trap', 'monster', 'boss'].includes(w.phase) ? 0.75 : 0.4) : 0) - du.a.value) * Math.min(1, dt * 3); du.time.value = now;
@@ -584,10 +690,17 @@ export function createTowerView(canvas, opts = {}) {
       const atk = Math.max(0, 1 - (now - monVis.atkT) / 0.6), lunge = Math.sin(Math.min(1, (now - monVis.atkT) / 0.6) * Math.PI) * 1.6;
       const hitK = Math.max(0, 1 - (now - monVis.hitT) / 0.18);
       const scl = (boss ? 1.7 : 1.05) * (0.2 + 0.8 * em) * (1 + hitK * 0.06);
-      monster.position.set(monVis.x + (hitK > 0 ? (Math.random() - 0.5) * 0.15 : 0), baseY + (key === 'ghost' ? 0.4 + Math.sin(now * 1.8) * 0.3 : 0), monVis.z + lunge);
+      monster.position.set(monVis.x + (hitK > 0 ? (Math.random() - 0.5) * 0.15 : 0), baseY + (key === 'ghost' ? (wraith ? 0.25 : 0.4) + Math.sin(now * 1.8) * (wraith ? 0.15 : 0.3) : 0), monVis.z + lunge * (wraith && key === 'ghost' ? 0.4 : 1));
       monster.scale.setScalar(scl);
       monster.rotation.set(0, Math.sin(now * 0.8) * 0.15, key === 'ghost' ? Math.sin(now * 1.3) * 0.06 : 0);
-      if (key === 'ghost') { const u = g.userData; u.crown.visible = boss; monGhostMat.color.setHex(boss ? 0xcab8ff : 0xe8ecff); monGhostMat.emissive.setHex(hitK > 0 ? 0xffffff : boss ? 0x3a1a6a : 0x2a2a60); u.mouth.scale.set(0.5, 0.42 + atk * 0.5 + Math.sin(now * 5) * 0.06, 0.2); }
+      if (key === 'ghost' && wraith) {
+        const a = boss ? bossA : wraith; wraith.obj.visible = !boss; bossA.obj.visible = boss;
+        g.userData.crown.position.set(0, 2.95 * 1.45 * 0.98, 0); g.userData.crown.visible = boss;
+        a.play(em < 1 ? 'spawn' : 'combat', now);
+        if (now - monVis.atkT < 0.05) a.play(boss ? (mo.slam ? 'spin' : 'slash') : 'cast', now);
+        if (now - monVis.hitT < 0.03 && now >= a.until) a.play('hit', now, { speed: 1.6 });
+        tickActor(kit, a, dt, now);
+      } else if (key === 'ghost') { const u = g.userData; u.crown.visible = boss; monGhostMat.color.setHex(boss ? 0xcab8ff : 0xe8ecff); monGhostMat.emissive.setHex(hitK > 0 ? 0xffffff : boss ? 0x3a1a6a : 0x2a2a60); u.mouth.scale.set(0.5, 0.42 + atk * 0.5 + Math.sin(now * 5) * 0.06, 0.2); }
       if (key === 'spider') g.userData.legs.forEach((L, i) => { L.rotation.x = Math.sin(now * 10 + i * 1.3) * 0.25 * (1 + atk); });
       if (key === 'mimic') g.userData.lidP.rotation.x = -0.35 - Math.abs(Math.sin(now * 4)) * 0.5 - atk * 0.6;
       for (const hm of hitMats) hm.emissive.setHex(hitK > 0 ? 0x888888 : 0x100008);
@@ -736,18 +849,18 @@ export function createTowerView(canvas, opts = {}) {
   const pv = new Vector3();
   const project = (x, y, z) => { pv.set(x, y, z).project(camera); return { x: (pv.x * 0.5 + 0.5) * W, y: (-pv.y * 0.5 + 0.5) * H, vis: pv.z < 1 && pv.z > -1 }; };
   return {
-    kind: 'webgl', renderer,
+    kind: 'webgl', renderer, ready, scene, get loaded() { return !!kit; }, get error() { return loadErr; },
     resize(w, h, pr) { W = w; H = h; renderer.setPixelRatio(pr); renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w / h < 0.7 ? 50 : 42; camera.updateProjectionMatrix(); glow.mat.uniforms.px.value = solid.mat.uniforms.px.value = h * pr * 0.9; dust.material.uniforms.px.value = h * pr * 0.5; },
     setQuality(q) { quality = q; partMult = q.particles; },
     frame, fx, project,
     speaking(on) { miraSpeaking = on; },
-    doorTop(i) { const r = rooms.get(curFloor); if (!r || !r.doors[i]) return null; return project(r.doors[i].x, baseY + 5.95, DOOR_Z + 0.4); },
+    doorTop(i) { const r = rooms.get(curFloor); if (!r || !r.doors[i]) return null; return project(r.doors[i].x, baseY + (r.doors[i].top || 5.95), DOOR_Z + 0.4); },
     monsterTop() { if (!monster.visible || monVis.dieT > 0) return null; return project(monVis.x, baseY + (lastW && lastW.mo && lastW.mo.b ? 6.6 : 3.9), monVis.z); },
     miraTop() { return project(mira.position.x, mira.position.y + 2.2, mira.position.z); },
     drawn: () => drawn,
     thunder() { if (thunderAt && time >= thunderAt) { thunderAt = 0; return true; } return false; },
-    stats() { const i = renderer.info; return { calls: i.render.calls, tris: i.render.triangles, tex: i.memory.textures, geo: i.memory.geometries, chars: P.body.count, parts: glow.list.length + solid.list.length, rooms: rooms.size }; },
-    dispose() { for (const r of rooms.values()) disposeRoom(r); rooms.clear(); scene.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); for (const x of global) x.dispose?.(); renderer.dispose(); },
+    stats() { const i = renderer.info; return { calls: i.render.calls, tris: i.render.triangles, tex: i.memory.textures, geo: i.memory.geometries, chars: kit ? [...vis.values()].filter((v) => v.a).length : P.body.count, ghosts: [...ghostVis.values()].filter((v) => v.a).length, loaded: !!kit, parts: glow.list.length + solid.list.length, rooms: rooms.size }; },
+    dispose() { disposed = true; for (const r of rooms.values()) disposeRoom(r); rooms.clear(); scene.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); for (const x of global) x.dispose?.(); if (env) env.dispose(); if (kit) kit.dispose(); renderer.dispose(); },
     loseContext() { try { renderer.forceContextLoss(); } catch {} },
   };
 }
