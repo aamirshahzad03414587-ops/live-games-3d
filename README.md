@@ -117,7 +117,8 @@ npm test
 node tools/build.mjs            # rebuild public/br/app.js + public/tower/app.js after editing client/ (commit the bundle; Render doesn't build it)
 MINUTES=10 node tools/soak-webkit.mjs        # iPhone-profile WebKit soak (Playwright)
 node tools/render-demo.mjs screenshots/br-demo.mp4 56   # vertical demo video with sound
-GAME=tower node tools/render-demo.mjs screenshots/tower-demo.mp4 56
+node tools/render-tower-demo.mjs screenshots/tower-demo.mp4 56
+GAME=tower MINUTES=10 node tools/soak-webkit.mjs
 ```
 Code: `public/shared/br-sim.js` (rules, isomorphic), `public/shared/commands.js` (commands, gift tiers),
 `public/shared/br-lines.js` (announcer), `src/games/br.js` (server loop), `src/tiktok.js` (LIVE connection, from

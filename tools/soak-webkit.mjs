@@ -1,4 +1,4 @@
-// iPhone-profile WebKit soak for the Battle Royale overlay: a busy fake LIVE (200+ viewers, gifts, likes, follows,
+// iPhone-profile WebKit soak for an overlay (GAME=br | tower): a busy fake LIVE (200+ viewers, gifts, likes, follows,
 // shares) runs on the server while WebKit (iPhone 13 profile) renders /br?mode=phone. Every 30 s it samples the
 // WebKit web process memory (PSS), frames drawn, renderer stats, quality level and the JS heap. At LOSE_AT minutes it
 // forces a WebGL context loss + restore to prove the recovery path.
@@ -11,6 +11,7 @@ const require = createRequire(import.meta.url);
 const { webkit, devices } = require(process.env.PLAYWRIGHT || '/tmp/shot/node_modules/playwright-core');
 const BASE = process.env.BASE || 'http://localhost:3940', MINUTES = Number(process.env.MINUTES || 10), OUT = process.env.OUT || 'screenshots/soak-webkit.json';
 const LOSE_AT = Number(process.env.LOSE_AT || 3), KEY = process.env.ADMIN_KEY || '';
+const GAME = process.env.GAME || 'br', G = GAME === 'tower' ? '__towerUI' : '__br';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const post = (p, body) => fetch(BASE + '/api/admin' + p, { method: 'POST', headers: { 'content-type': 'application/json', ...(KEY ? { 'x-admin-key': KEY } : {}) }, body: JSON.stringify(body || {}) }).then((r) => r.json()).catch((e) => ({ err: e.message }));
 // WebKitGTK on this Linux box has no media plugins: setting any <audio>.src crashes its web process (a test-machine
@@ -26,8 +27,8 @@ let crashed = 0; const errs = [];
 page.on('crash', () => { crashed++; console.log('PAGE CRASHED'); });
 page.on('pageerror', (e) => errs.push(e.message.slice(0, 200)));
 await post('/crowd', { mode: 'busy', minutes: MINUTES + 2 });
-await page.goto(`${BASE}/br?mode=phone&diag=0`, { waitUntil: 'load' });
-await page.waitForFunction(() => window.__br && window.__br.view, null, { timeout: 60000 });
+await page.goto(`${BASE}/${GAME}?mode=phone&diag=0`, { waitUntil: 'load' });
+await page.waitForFunction((g) => window[g] && window[g].view, G, { timeout: 60000 });
 await sleep(3000);
 await page.evaluate(() => { window.__raf = 0; const f = () => { window.__raf++; requestAnimationFrame(f); }; requestAnimationFrame(f); });
 function pss() {
@@ -41,7 +42,7 @@ function pss() {
 }
 let lastRaf = 0, lastT = Date.now(), lostDone = false;
 async function sample(tMin) {
-  const p = await page.evaluate(() => { const b = window.__br; const st = b.stats() || {}; return { kind: b.view.kind, level: b.level, fps: +b.fps.toFixed(1), phase: b.world.phase, fighters: b.world.fighters.length, calls: st.calls, tris: st.tris, tex: st.tex, geo: st.geo, chars: st.chars, parts: st.parts, raf: window.__raf || 0, nodes: document.getElementsByTagName('*').length, snaps: b.N.snaps, ev: b.N.ev, errs: b.N.err, canvas: [document.getElementById('gl').width, document.getElementById('gl').height] }; });
+  const p = await page.evaluate((g) => { const b = window[g]; const st = b.stats() || {}; return { kind: b.view.kind, level: b.level, fps: +b.fps.toFixed(1), phase: b.world.phase, floor: b.world.floor, fighters: (b.world.fighters || b.world.members).length, rooms: st.rooms, calls: st.calls, tris: st.tris, tex: st.tex, geo: st.geo, chars: st.chars, parts: st.parts, raf: window.__raf || 0, nodes: document.getElementsByTagName('*').length, snaps: b.N.snaps, ev: b.N.ev, errs: b.N.err, canvas: [document.getElementById('gl').width, document.getElementById('gl').height] }; }, G);
   const now = Date.now(), rafFps = +((p.raf - lastRaf) / ((now - lastT) / 1000)).toFixed(1); lastRaf = p.raf; lastT = now;
   return { tMin: +tMin.toFixed(2), webProcessMB: pss(), rafFps, ...p, crashed };
 }
@@ -52,12 +53,12 @@ while (Date.now() - t0 < MINUTES * 60e3) {
   if (el >= next) { const s = await sample(el).catch((e) => ({ tMin: +el.toFixed(2), error: e.message.slice(0, 120) })); samples.push(s); console.log(JSON.stringify(s)); next += 0.5; }
   if (!lostDone && el >= LOSE_AT) {
     lostDone = true;
-    ctxTest = await page.evaluate(async () => {
+    ctxTest = await page.evaluate(async (g) => {
       const c = document.getElementById('gl'); const gl = c.getContext('webgl2') || c.getContext('webgl'); const ext = gl && gl.getExtension('WEBGL_lose_context');
       if (!ext) return { skipped: 'no WEBGL_lose_context' };
       ext.loseContext(); await new Promise((r) => setTimeout(r, 1200)); ext.restoreContext(); await new Promise((r) => setTimeout(r, 2500));
-      return { kindAfter: window.__br.view.kind, framesAfter: window.__br.fps, level: window.__br.level };
-    }).catch((e) => ({ error: e.message }));
+      return { kindAfter: window[g].view.kind, framesAfter: window[g].fps, level: window[g].level };
+    }, G).catch((e) => ({ error: e.message }));
     console.log('context loss test', JSON.stringify(ctxTest));
   }
   await sleep(1000);
@@ -67,7 +68,7 @@ await post('/crowd', { mode: 'off' });
 const ok = samples.filter((s) => s.webProcessMB);
 const peak = (k) => Math.max(0, ...ok.map((x) => x[k] || 0));
 const firstMB = ok[2]?.webProcessMB, lastMB = ok.at(-1)?.webProcessMB;
-const summary = { minutes: MINUTES, crashed, kind: ok[0]?.kind, canvas: ok[0]?.canvas, peakWebProcessMB: peak('webProcessMB'), webProcessMBat1min: firstMB, webProcessMBend: lastMB, driftMB: +(lastMB - firstMB).toFixed(1),
+const summary = { game: GAME, minutes: MINUTES, maxFloor: peak('floor'), crashed, kind: ok[0]?.kind, canvas: ok[0]?.canvas, peakWebProcessMB: peak('webProcessMB'), webProcessMBat1min: firstMB, webProcessMBend: lastMB, driftMB: +(lastMB - firstMB).toFixed(1),
   maxFighters: peak('fighters'), maxCalls: peak('calls'), maxTris: peak('tris'), textures: ok.at(-1)?.tex, geometries: ok.at(-1)?.geo, avgRafFps: +(ok.slice(1).reduce((a, s) => a + (s.rafFps || 0), 0) / Math.max(1, ok.length - 1)).toFixed(1),
   levels: [...new Set(ok.map((s) => s.level))], contextLossTest: ctxTest, pageErrors: errs.slice(0, 10) };
 console.log('SUMMARY', JSON.stringify(summary));

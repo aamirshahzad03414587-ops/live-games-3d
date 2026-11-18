@@ -190,7 +190,7 @@ export class Tower {
     this.floor++;
     for (const m of this.people.values()) { m.door = -1; if (m.climb) { m.climb = null; m.y = 0; } }
     this.kinds = []; this.chosen = -1; this.outcome = ''; this.prophecy = -1; this.voteCounts = [0, 0, 0]; this.riddle = null; this.monster = null;
-    if (this.liftPending) { this.liftPending = false; this.floor++; }
+    if (this.liftPending) { this.liftPending = false; if (this.floor < this.o.topFloor) this.floor++; }
     const boss = this.floor % this.o.bossEvery === 0;
     const i = this.nextTheme(this.floor);
     this.themeIdx = i; this.theme = boss ? BOSS_THEME : THEMES[i]; this.upcoming = null;
