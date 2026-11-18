@@ -42,7 +42,7 @@ export class Siege {
   get alive() { let n = 0; for (const m of this.people.values()) if (m.on) n++; return n; }
   get humans() { let n = 0; for (const m of this.people.values()) if (m.on && !m.bot) n++; return n; }
   defenders() { return [...this.people.values()].filter((m) => m.on); }
-  get chapter() { return Math.min(3, Math.ceil(this.wave / WAVES_PER_CH) || this.o.startChapter); }
+  get chapter() { return Math.max(1, Math.min(3, Math.floor(this.wave / WAVES_PER_CH) + (this.phase === 'chapter' || this.wave % WAVES_PER_CH ? 1 : 0))); }
   get boss() { return this.enemies.find((e) => e.k === EK.boss && e.hp > 0) || null; }
 
   // ------------------------------------------------------------------ people
@@ -336,7 +336,7 @@ export class Siege {
     if (e.hp <= 0) {
       const E = ENEMIES[e.k];
       if (m) { m.runPts += E.pts; m.pts += E.pts; m.kills++; m.runKills = (m.runKills || 0) + 1; }
-      if (e.k === EK.boss) this.emit({ k: 'bossdown', id: e.bossId, name: e.name, by: m ? m.id : 0 });
+      if (e.k === EK.boss) this.emit({ k: 'bossdown', id: e.bossId, name: e.name, by: m && !m.bot ? m.id : 0 });
       else if (this.killBudget >= 1) { this.killBudget--; this.emit({ k: 'kill', e: e.id, by: m ? m.id : 0, x: +e.x.toFixed(1), z: +e.z.toFixed(1), q: e.k }); }
     }
   }

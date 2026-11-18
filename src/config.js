@@ -27,6 +27,11 @@ export function defaults() {
       riddleSeconds: 22, bossSeconds: 32,
       voice: env.MIRA_VOICE || 'en-US-AvaNeural', rate: env.MIRA_RATE || '+4%', pitch: env.MIRA_PITCH || '-2Hz',
     },
+    siege: {
+      gatherSeconds: num(env.SIEGE_GATHER_SECONDS, 14), voteSeconds: num(env.SIEGE_VOTE_SECONDS, 16), minDefenders: num(env.SIEGE_MIN_DEFENDERS, 6), bots: env.SIEGE_BOTS !== '0',
+      introSeconds: num(env.SIEGE_INTRO, 1), spawnMul: num(env.SIEGE_SPAWN_MUL, 1), enemyHpMul: num(env.SIEGE_ENEMY_HP_MUL, 1), dmgMul: 1,
+      voice: env.NARRATOR_VOICE || 'en-US-ChristopherNeural', rate: env.NARRATOR_RATE || '-6%', pitch: env.NARRATOR_PITCH || '-10Hz',
+    },
   };
 }
 
@@ -34,7 +39,7 @@ export function loadConfig() {
   const c = defaults();
   try {
     const saved = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-    for (const k of ['tiktok', 'voice', 'br', 'tower']) if (saved[k]) Object.assign(c[k], saved[k]);
+    for (const k of ['tiktok', 'voice', 'br', 'tower', 'siege']) if (saved[k]) Object.assign(c[k], saved[k]);
     if (env.TIKTOK_USERNAME) c.tiktok.username = env.TIKTOK_USERNAME.replace(/^@/, '');   // the env wins on Render
   } catch {}
   return c;
@@ -43,7 +48,7 @@ export function loadConfig() {
 export function saveConfig(c) {
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-    const { tiktok, voice, br, tower } = c;
-    fs.writeFileSync(FILE, JSON.stringify({ tiktok: { ...tiktok, signApiKey: undefined }, voice, br, tower }, null, 1));
+    const { tiktok, voice, br, tower, siege } = c;
+    fs.writeFileSync(FILE, JSON.stringify({ tiktok: { ...tiktok, signApiKey: undefined }, voice, br, tower, siege }, null, 1));
   } catch (e) { console.log('[config] save failed:', e.message); }
 }
