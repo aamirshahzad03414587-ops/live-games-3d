@@ -46,7 +46,7 @@ const votes = S.filter((s) => s.ev.type === 'vote'); const rest = S.filter((s) =
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
 const page = await (await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: DPR })).newPage();
 page.on('pageerror', (e) => console.log('PAGEERROR', e.message));
-const url = `${BASE}/siege?render=1&mode=pc&q=0&seed=11&lore=${LORE}&gatherSeconds=4&chapterSeconds=2.6&startWave=2&waveCap=7&breakSeconds=1.2&victorySeconds=2.2&voteSeconds=5&choiceSeconds=3.4&minDefenders=6`;
+const url = `${BASE}/siege?render=1&mode=pc&q=0&seed=11&lore=${LORE}&gatherSeconds=4&chapterSeconds=2.6&startWave=2&waveCap=7&breakSeconds=1.2&victorySeconds=2.2&voteSeconds=5&choiceSeconds=3.4&minDefenders=6&enemyHpMul=${process.env.HPMUL || 0.5}`;
 await page.goto(url);
 await page.waitForFunction(() => window.__render && window.__siegeUI.view);
 let si = 0, vi = -1; const t0 = Date.now(); let info = null;

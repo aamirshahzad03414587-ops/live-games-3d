@@ -5,7 +5,8 @@ body.siege, .siege #stage { background: #0a0514; }
 .siege #howto .title.join { background: linear-gradient(180deg, #ffe08a, #ff9a3c); color: #2a0f00; border-color: #fff0c8; text-shadow: none; box-shadow: 0 calc(var(--u) * 0.8) 0 #9a3a00, 0 0 calc(var(--u) * 6) rgba(255,150,60,0.55); }
 .siege #howto .title.vote { background: linear-gradient(180deg, #a8f0ff, #3a8aff); color: #fff; border-color: #e0faff; box-shadow: 0 calc(var(--u) * 0.8) 0 #003a9a, 0 0 calc(var(--u) * 6) rgba(80,170,255,0.7); animation: votePulse 1s ease-in-out infinite; }
 .siege #howto .title.fight { background: linear-gradient(180deg, #ff8a8a, #e0204a); color: #fff; border-color: #ffd0d0; box-shadow: 0 calc(var(--u) * 0.8) 0 #7a0020; }
-.siege #howto .chips span { font-size: calc(var(--u) * 2.7); }
+.siege #howto .chips span { font-size: calc(var(--u) * 2.7); white-space: nowrap; }
+.siege #howto .chips { flex-wrap: nowrap; justify-content: center; }
 #surv { position: absolute; top: 21.4%; left: 6%; right: 6%; text-align: center; pointer-events: none; }
 #surv .sl { font-weight: 900; font-size: calc(var(--u) * 2.6); letter-spacing: 0.12em; color: #cfe8ff; text-shadow: 0 2px 0 #000, 0 0 6px #000; }
 #surv .sn { font-weight: 900; font-style: italic; font-size: calc(var(--u) * 8.6); line-height: 1.02; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: #fff;

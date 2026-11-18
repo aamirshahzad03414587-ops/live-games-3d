@@ -367,13 +367,13 @@ function onBoard(d) {
 }
 let boardMode = 0, boardFlip = 0;
 function renderBoard(now) {
-  const show = ['gather', 'ending', 'break', 'choice', 'chapter'].includes(world.phase);
+  const show = ['gather', 'ending', 'break', 'chapter'].includes(world.phase);
   const el = $('board'); el.hidden = !show; if (!show || !board) return;
   if (now - boardFlip > 7) { boardFlip = now; boardMode ^= 1; }
   const useAll = boardMode && board.all && board.all.length;
   const list = (useAll ? board.all : board.session) || [];
   const title = useAll ? `👑 ALL-TIME DEFENDERS${board.saves ? ` · 🌍×${board.saves}` : ''}` : "🛡️ TODAY'S DEFENDERS";
-  const html = list.length ? list.slice(0, 5).map((p) => `<li><span class="nm">${esc(p.name)}</span><span class="sc">${p.pts}⚔️${p.kills ? ' · ' + p.kills + '💀' : ''}</span></li>`).join('') : '';
+  const html = list.length ? list.slice(0, 4).map((p) => `<li><span class="nm">${esc(p.name)}</span><span class="sc">${p.pts}⚔️${p.kills ? ' · ' + p.kills + '💀' : ''}</span></li>`).join('') : '';
   const key = title + html;
   if (el.__k === key) return; el.__k = key;
   $('boardTitle').textContent = title;
@@ -469,10 +469,10 @@ function domHud(now) {
   const cine = w.phase === 'intro';
   body.classList.toggle('cine', cine);
   // how-to banner follows the phase
-  let title = '💬 COMMENT TO DEFEND!', cls = '', chips = ['🔮 mage · ⚔️ warrior · 🏹 archer · 💚 healer', '❤️ likes = barrier', '🎁 gifts = spells'];
+  let title = '💬 COMMENT TO DEFEND!', cls = '', chips = ['🔮⚔️🏹💚 type a class', '❤️ likes = barrier'];
   if (w.phase === 'gather' || w.phase === 'ending' || cine) { title = '🏰 COMMENT TO JOIN!'; cls = 'join'; chips = ['type mage · warrior · archer · healer', '❤️ likes = barrier', '➕ follow = blessing']; }
   else if (w.phase === 'vote') { title = '🗳️ COMMENT 1 OR 2!'; cls = 'vote'; chips = ['the story changes for good']; }
-  else if (w.phase === 'boss') { title = '💥 BOSS! SPAM CHAT!'; cls = 'fight'; chips = ['💬 comments = haste', '⚡ 100🪙 = ultimate', '🐉 500🪙 = judgment']; }
+  else if (w.phase === 'boss') { title = '💥 BOSS! SPAM CHAT!'; cls = 'fight'; chips = ['💬 comments = haste', '🐉 500🪙 = judgment']; }
   else if (fight) { title = '💬 CHAT = FASTER ATTACKS'; cls = 'fight'; chips = ['🔮 mage · ⚔️ warrior · 🏹 archer · 💚 healer', '❤️ likes = barrier']; }
   const ck = chips.join('|'); if ($('howChips').__k !== ck) { $('howChips').__k = ck; $('howChips').innerHTML = chips.map((c) => `<span>${esc(c)}</span>`).join(''); }
   setText('howTitle', title); $('howTitle').className = 'title' + (cls ? ' ' + cls : '');
