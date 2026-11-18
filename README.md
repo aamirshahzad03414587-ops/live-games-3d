@@ -24,7 +24,11 @@ direct connection, use `/br?mode=pc&key=ADMIN_KEY` (the overlay forwards TikFini
 and set `LIVE_SOURCE=tikfinity` or `both`.
 
 ## How viewers play (Battle Royale)
-- **Comment anything** → you drop into the arena as a cute fighter with your name and colour. Fighters auto-fight.
+- **Comment anything** → you drop into the arena as an animated KayKit hero (Knight, Barbarian, Mage or Rogue) with a
+  small name tag and a ring in your colour; bots are skeletons. Fighters auto-fight.
+- **Nothing to read on screen**: the voice explains how to play and what each gift does (short tips in quiet moments)
+  and calls the action. The screen only shows small name tags, a timer ring with the fighters-left count, and the
+  winner's name at the ceremony. Gift powers show as light pillars, rings, meteors and giants.
 - `attack NAME` / `⚔️ NAME` / `@name` → go after that player · `shield` / `🛡️` · `dash` / `💨`
 - `revenge` → hunt whoever last hit you · `dance` / `💃` · `color pink|gold|blue|…` → change colour
 - **Likes**: +1 HP per like (max +10 a time) and charge a spin attack (4% per like); every 300 likes of the room = 
@@ -136,9 +140,15 @@ on battery), `?q=0..3` fixed quality, `?view=2d` force the 2D fallback, `?mute=1
 ## iPhone safety (why it doesn't crash Safari)
 - 3D canvas ≤ 780 px wide, pixel ratio ≤ 1.5, auto quality (4 levels by measured FPS: pixel ratio, fighters drawn,
   labels, particles, glow), 30 fps cap on phones.
-- Instanced low-poly chibis: ~22 draw calls for the whole scene, ≤ 56 fighters drawn (the rest still fight and show on
-  the leaderboard/kill feed), 3 small textures (procedural), no real-time shadows (blob shadows), no post-processing
-  ("bloom" is additive glow sprites), fixed-size particle/ring/meteor pools: nothing allocated per frame.
+- Rigged CC0 KayKit characters, built for phones: each character file is merged once into a single skinned mesh
+  (body + weapon + hat baked onto the bones = 1 draw call, ~5k triangles, one 256 px texture), every fighter shares
+  one set of animation clips (`/models/anims.glb`), actors are cloned with SkeletonUtils and pooled, viewer colours
+  are cached material variants. ≤ 40 animated fighters drawn on a phone (16 at the lowest quality; the rest still
+  fight on the server); far/crowded fighters animate at half rate. All models: ~2 MB (meshopt-compressed GLB).
+- The hex-island arena is instanced (one draw call per prop type, ~35 for the whole island and its scenery), one
+  512 px atlas texture, hemisphere + one sun light, fog, gradient sky, no real-time shadows (blob shadows), no
+  post-processing ("bloom" is additive glow sprites), fixed-size particle/ring/meteor pools: nothing allocated per
+  frame. Everything is disposed when the view is torn down.
 - WebGL context-lost handler: pauses, recovers on restore at a lower quality, switches to the **2D fallback** if it
   keeps losing the context or doesn't come back in 4 s (and when WebGL is missing).
 - Sound: one AudioContext unlocked by a tap + a real silent MP3 (never an empty WAV), synthesized effects (no audio
@@ -147,6 +157,22 @@ on battery), `?q=0..3` fixed quality, `?view=2d` force the 2D fallback, `?mute=1
   the previous session's last report after a Safari crash). No names, comments, URLs or keys.
 - The game runs on the server; the phone only renders 10 snapshots a second (interpolated), so a backgrounded Safari or
   a reconnect never loses the round.
+
+## Art credits (CC0)
+Characters, animations and the arena are from **KayKit by Kay Lousberg** ([kaylousberg.com](https://www.kaylousberg.com)),
+released under **CC0 1.0** (public domain; credit appreciated, not required). Taken from the official GitHub repos,
+pinned commits:
+
+| Pack | Repo | Commit | Used for |
+|---|---|---|---|
+| Character Pack: Adventurers 1.0 | [KayKit-Character-Pack-Adventures-1.0](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0) | `672074b` | Knight, Barbarian, Mage, Rogue, hooded Rogue |
+| Character Pack: Skeletons 1.0 | [KayKit-Character-Pack-Skeletons-1.0](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0) | `15b62b9` | skeleton bots / enemies, all animation clips |
+| Medieval Hexagon Pack 1.0 | [KayKit-Medieval-Hexagon-Pack-1.0](https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0) | `84fa4e9` | BR hex island, castle, villages, forests, clouds |
+| Dungeon Remastered 1.0 | [KayKit-Dungeon-Remastered-1.0](https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0) | `b0ca9bd` | (tower / siege environments) |
+| Halloween Bits 1.0 | [KayKit-Halloween-Bits-1.0](https://github.com/KayKit-Game-Assets/KayKit-Halloween-Bits-1.0) | `6dc69bf` | (tower / siege props) |
+
+Rebuild the optimised GLBs: `bash tools/assets/fetch.sh` (clones the packs into `../assets-src` at those commits),
+`node tools/assets/build-chars.mjs`, `node tools/assets/build-env.mjs br`.
 
 ## Develop
 ```

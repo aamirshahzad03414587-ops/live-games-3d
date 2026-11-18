@@ -23,6 +23,8 @@ export async function loadEnv(url) {
       let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
       for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
       for (const k of ['position', 'normal', 'uv']) { const a = g.attributes[k]; if (!a || (a.array instanceof Float32Array && !a.normalized)) continue; const arr = new Float32Array(a.count * a.itemSize); for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) arr[i * a.itemSize + c] = GET[c].call(a, i); g.setAttribute(k, new BufferAttribute(arr, a.itemSize)); }
+      if (!g.attributes.normal) g.computeVertexNormals();
+      if (!g.attributes.uv) g.setAttribute('uv', new BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
       g.applyMatrix4(new Matrix4().multiplyMatrices(inv, o.matrixWorld));
       parts.push(g);
     });

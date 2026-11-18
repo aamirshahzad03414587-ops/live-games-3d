@@ -33,7 +33,7 @@ export class BRGame {
       for (const l of this.lines.lines(ev, sim.t)) this.announcer.push(l);
       for (const e of ev) if (e.k === 'win') this.onRoundEnd();
       this.pendingEv.push(...ev);
-    } else this.lines.lines([], sim.t);   // flushes batched welcomes
+    } else for (const l of this.lines.lines([], sim.t)) this.announcer.push(l);   // batched welcomes + spoken tips
     if (++this.tick % 2) return;
     const roster = sim.drainRoster();
     const n = this.listeners();

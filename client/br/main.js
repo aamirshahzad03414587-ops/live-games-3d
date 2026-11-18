@@ -22,15 +22,16 @@ if (qs.get('clean') === '1') document.body.classList.add('clean');
 
 // ------------------------------------------------------------------ quality levels (auto by measured FPS)
 const QL = PHONE ? [
-  { pr: 1.5, maxW: 780, maxChars: 56, labels: 24, particles: 1, halos: true, stars: true },
-  { pr: 1.25, maxW: 700, maxChars: 44, labels: 18, particles: 0.75, halos: true, stars: true },
-  { pr: 1.0, maxW: 600, maxChars: 34, labels: 14, particles: 0.5, halos: true, stars: false },
-  { pr: 0.8, maxW: 480, maxChars: 26, labels: 10, particles: 0.35, halos: false, stars: false },
+  // animated characters are the main cost: cap how many are drawn, and animate far ones at a lower rate
+  { pr: 1.5, maxW: 780, maxChars: 40, labels: 14, particles: 1, halos: true, animLod: 1 },
+  { pr: 1.25, maxW: 700, maxChars: 32, labels: 12, particles: 0.75, halos: true, animLod: 1 },
+  { pr: 1.0, maxW: 600, maxChars: 24, labels: 10, particles: 0.5, halos: true, animLod: 2 },
+  { pr: 0.8, maxW: 480, maxChars: 16, labels: 8, particles: 0.35, halos: false, animLod: 2 },
 ] : [
-  { pr: 2, maxW: Number(qs.get('maxw')) || 1080, maxChars: 64, labels: 30, particles: 1, halos: true, stars: true },
-  { pr: 1.5, maxW: 900, maxChars: 56, labels: 24, particles: 1, halos: true, stars: true },
-  { pr: 1.0, maxW: 700, maxChars: 40, labels: 16, particles: 0.6, halos: true, stars: false },
-  { pr: 0.8, maxW: 540, maxChars: 28, labels: 12, particles: 0.4, halos: false, stars: false },
+  { pr: 2, maxW: Number(qs.get('maxw')) || 1080, maxChars: 60, labels: 18, particles: 1, halos: true, animLod: 1 },
+  { pr: 1.5, maxW: 900, maxChars: 48, labels: 16, particles: 1, halos: true, animLod: 1 },
+  { pr: 1.0, maxW: 700, maxChars: 36, labels: 12, particles: 0.6, halos: true, animLod: 2 },
+  { pr: 0.8, maxW: 540, maxChars: 24, labels: 10, particles: 0.4, halos: false, animLod: 2 },
 ];
 let level = qs.has('q') ? Math.max(0, Math.min(3, Number(qs.get('q')))) : 0;
 const fixedQ = qs.has('q');
@@ -42,7 +43,8 @@ function makeView() {
   const want2d = qs.get('view') === '2d' || localStorage.getItem('lg_force2d') === '1';
   if (!want2d) {
     try {
-      view = createView3D(canvas, { maxChars: QL[0].maxChars, particles: PHONE ? 800 : 1200, aa: !PHONE || IOS, preserve: RENDER, floorSize: PHONE ? 512 : 1024, platform: 20 });
+      view = createView3D(canvas, { maxChars: QL[0].maxChars, particles: PHONE ? 800 : 1200, aa: !PHONE || IOS, preserve: RENDER, platform: 20 });
+      view.ready.catch(() => { mark('assets-fail'); to2D(); });   // models failed to load: the 2D view still works
       canvas.addEventListener('webglcontextlost', onLost, false);
       canvas.addEventListener('webglcontextrestored', onRestored, false);
       return;
@@ -122,11 +124,11 @@ function connect() {
 }
 function onMsg(d) {
   switch (d.t) {
-    case 'hello': roster.clear(); applyRoster(d.roster); snaps = []; offset = null; tiers = d.tiers || tiers; renderGifts(); onBoard(d); pushSnap(d.snap); break;
+    case 'hello': roster.clear(); applyRoster(d.roster); snaps = []; offset = null; tiers = d.tiers || tiers; onBoard(d); pushSnap(d.snap); break;
     case 'roster': applyRoster(d.add, d.del); break;
     case 's': pushSnap(d); break;
     case 'say': say(d.text, d.url, d.dur); break;
-    case 'banner': banner(d.text); break;
+    case 'banner': break;   // no on-screen words: the voice says it
     case 'board': onBoard(d); break;
     case 'status': tiktokState = d.tiktok?.state || ''; $('conn').className = tiktokState === 'connected' ? 'connected' : /wait|connecting|reconnect/.test(tiktokState) ? 'waiting' : tiktokState === 'error' ? 'error' : ''; maybeTikFinity(d.tiktok); break;
   }
@@ -206,7 +208,6 @@ function localWorld(dt, now) {
   return buildWorld(s, null, 0);
 }
 function localSay(l, now) {
-  if (l.banner) banner(l.banner);
   const item = { ...l, at: now, p: null };
   item.p = fetch('/api/say?text=' + encodeURIComponent(l.text)).then((r) => r.json()).catch(() => ({ url: null }));
   sayPending++; item.p.finally(() => sayPending--);
@@ -228,7 +229,6 @@ async function pumpLocalSay(now) {
 const nameOf = (id) => roster.get(id)?.name || '?';
 const colorOf = (id) => '#' + ((roster.get(id)?.color ?? 0xffffff) >>> 0).toString(16).padStart(6, '0');
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const dmgNums = [];
 function handleEvent(e, stale) {
   N.ev++;
   if (!stale && view && !paused) try { view.fx(e, world); } catch (err) { N.err++; }
@@ -236,11 +236,10 @@ function handleEvent(e, stale) {
   switch (e.k) {
     case 'hit': {
       S(e.c ? 'crit' : 'punch', e.s ? 0.5 : 1);
-      if (!stale && dmgNums.length < 32) { const f = world.fighters.find((x) => x.id === e.b); if (f) dmgNums.push({ x: f.x, y: f.y, z: f.z, v: e.d, c: e.c, s: e.s, t0: clockNow() }); }
       break;
     }
     case 'block': S('block'); break;
-    case 'ko': S('ko'); feed(e); break;
+    case 'ko': S('ko'); break;
     case 'dash': S('dash'); break;
     case 'shield': S('shield'); break;
     case 'spin': S('spin'); break;
@@ -250,150 +249,119 @@ function handleEvent(e, stale) {
     case 'boom': S('boom'); break;
     case 'nuke': S('nuke'); flash(); break;
     case 'power': case 'revive': S('power'); break;
-    case 'gift': S('coin'); toast(e.tier, `${tierIcon(e.tier)} ${esc(e.n)} sent ${esc(e.g)}`, `→ ${tierLabel(e.tier)}${world.phase !== 'battle' ? ' ⏳' : ''}`); break;
-    case 'perk': S('power'); toast('perk', e.perk === 'follow' ? `➕ ${esc(e.n)} followed` : `🔁 ${esc(e.n)} shared`, e.perk === 'follow' ? '→ +30 armor' : '→ RAGE MODE'); break;
-    case 'hype': S('heal'); S('cheer'); toast('perk', '❤️ LIKE RAIN!', 'every viewer fighter heals'); break;
+    case 'gift': S('coin'); break;   // the gift's power is shown as VFX on the giver's fighter and spoken
+    case 'perk': S('power'); break;
+    case 'hype': S('heal'); S('cheer'); break;
     case 'phase':
-      if (e.ph === 'battle') { S('go'); $('feed').innerHTML = ''; }
+      if (e.ph === 'battle') S('go');
       if (e.ph === 'lobby') { $('winner').hidden = true; }
       break;
     case 'win': S('fanfare'); showWinner(e); break;
-    case 'join': if (e.vip && !stale) toast('perk', `⭐ ${esc(e.n)} VIP drop-in!`, 'gifts skip the queue'); break;
+    case 'join': break;
   }
   if (e.k !== 'hit' && e.k !== 'atk') mark(e.k);
 }
 function clockNow() { return RENDER ? vclock : performance.now() / 1000; }
-const tierIcon = (id) => (tiers.find((t) => t.id === id) || {}).icon || '🎁';
-const tierLabel = (id) => (tiers.find((t) => t.id === id) || {}).label || id;
-function feed(e) {
-  const el = document.createElement('div'); el.className = 'k';
-  const B = `<span style="color:${colorOf(e.b)}">${esc(nameOf(e.b))}</span>`;
-  el.innerHTML = e.a ? `<span style="color:${colorOf(e.a)}">${esc(nameOf(e.a))}</span> ${e.m ? '☄️' : '🥊'} ${B}${e.multi ? ' <b>×' + e.multi.split(' ')[0] + '</b>' : ''}` : `🌀 ${B}`;
-  const f = $('feed'); f.prepend(el); while (f.children.length > 3) f.lastChild.remove();
-}
-function toast(kind, title, sub) {
-  const el = document.createElement('div'); el.className = 't ' + kind; el.innerHTML = `${title}<small>${sub}</small>`;
-  const t = $('toasts'); t.prepend(el); while (t.children.length > 2) t.lastChild.remove();
-  later(() => el.remove(), 3600);
-}
-let bannerT = 0;
-function banner(text) {
-  const b = $('banner'); b.hidden = false; b.classList.remove('show'); void b.offsetWidth; b.textContent = text; b.classList.add('show');
-  clearTimeout(bannerT); bannerT = later(() => { b.hidden = true; }, 1650);
-}
 function flash() { const f = $('flash'); f.style.transition = 'none'; f.style.opacity = '0.85'; void f.offsetWidth; f.style.transition = 'opacity 0.8s ease-out'; f.style.opacity = '0'; }
 let sayT = 0;
 function say(text, url, dur) {
   N.say++;
-  const el = $('say'); el.hidden = false; el.innerHTML = `<span>${esc(text)}</span>`;
-  clearTimeout(sayT); sayT = later(() => { el.hidden = true; }, Math.max(1800, (dur || 2) * 1000 + 600));
-  if (url) audio.voice(url, dur);
+  if (url) audio.voice(url, dur);   // spoken only: nothing is written on screen
 }
 function showWinner(e) {
+  // the only words on screen: the champion's name (the rest is spoken)
   const w = $('winner');
-  if (e.a > 0) { $('winName').textContent = nameOf(e.a); $('winName').style.color = colorOf(e.a); $('winSub').textContent = `${e.kills} kill${e.kills === 1 ? '' : 's'} · ${roster.get(e.a)?.bot ? 'bots win this time – comment to take it back!' : 'GG! Shoutout! 🎉'}`; }
-  else { $('winName').textContent = 'The storm'; $('winName').style.color = '#d08cff'; $('winSub').textContent = 'nobody survived!'; }
+  if (e.a > 0) { $('winName').textContent = shortName(nameOf(e.a), 18); $('winName').style.color = colorOf(e.a); }
+  else { $('winName').textContent = '🌀'; $('winName').style.color = '#d08cff'; }
   w.hidden = false; w.style.animation = 'none'; void w.offsetWidth; w.style.animation = '';
 }
-function renderGifts() {
-  $('gifts').innerHTML = [...tiers].reverse().map((t) => `<div><span>${t.icon} ${esc(t.label.replace('STORM ', '').replace(' STRIKE', '').replace(' MODE', '').replace(' BOOST', ''))}</span><b>${t.min}🪙</b></div>`).join('');
-}
+const shortName = (n, max = 10) => { n = String(n || '?').replace(/\s+/g, ' ').trim(); return [...n].length > max ? [...n].slice(0, max - 1).join('') + '…' : n; };
 function onBoard(d) {
   if (!d || (!d.session && !d.all)) return;
   board = d;
   if (d.signed) try { localStorage.setItem('lg_brBoard', JSON.stringify(d.signed)); } catch {}
 }
-let boardMode = 0, boardFlip = 0;
-function renderBoard(now) {
-  const show = world.phase !== 'battle';
-  const el = $('board'); el.hidden = !show; if (!show || !board) return;
-  if (now - boardFlip > 7) { boardFlip = now; boardMode ^= 1; }
-  const list = (boardMode && board.all && board.all.length ? board.all : board.session) || [];
-  const title = boardMode && board.all && board.all.length ? '👑 ALL-TIME LEGENDS' : "🏆 TODAY'S CHAMPS";
-  const html = list.length ? list.slice(0, 5).map((p) => `<li><span class="nm">${esc(p.name)}</span><span class="sc">${p.wins}🏆 ${p.kills}⚔️</span></li>`).join('') : '';
-  const key = title + html;
-  if (el.__k === key) return; el.__k = key;
-  $('boardTitle').textContent = title;
-  $('boardList').innerHTML = html || '<div class="empty">No winners yet – comment to be the first! 👑</div>';
-}
-
 // ------------------------------------------------------------------ HUD canvas: names, HP bars, damage numbers
 function drawHud(now) {
   const pr = hud.__pr || 1, u = cssW / 100;
   hg.setTransform(1, 0, 0, 1, 0, 0); hg.clearRect(0, 0, hud.width, hud.height); hg.setTransform(pr, 0, 0, pr, 0, 0);
   if (!view || paused) return;
+  drawTags(now, u);
+  drawRing(now, u);
+}
+// small name tags (shortened); in crowds they shrink and fade instead of stacking up
+const tagAlpha = new Map();
+function drawTags(now, u) {
   const drawn = view.drawn() || world.fighters;
   const q = QL[level];
-  const cand = drawn.filter((f) => f.flags & FLAG.alive).map((f) => ({ f, s: (f.flags & FLAG.cmd ? 8 : 0) + (f.flags & FLAG.crown ? 6 : 0) + (f.flags & FLAG.giant ? 4 : 0) + (f.flags & FLAG.bot ? 0 : 3) + (100 - f.hp) * 0.01 }));
+  const cand = drawn.filter((f) => f.flags & FLAG.alive).map((f) => ({ f, s: (f.flags & FLAG.cmd ? 8 : 0) + (f.flags & FLAG.crown ? 6 : 0) + (f.flags & FLAG.giant ? 4 : 0) + (f.flags & FLAG.bot ? -4 : 3) }));
   cand.sort((a, b) => b.s - a.s);
-  const many = cand.length > 16;
-  const fs = Math.round(u * (many ? 2.7 : 3.1));
+  const crowded = cand.length > 14;
+  const fsz = Math.round(u * (crowded ? 2.3 : 2.7));
   hg.textAlign = 'center'; hg.textBaseline = 'middle'; hg.lineJoin = 'round';
-  const placed = [];
+  hg.font = `800 ${fsz}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+  const placed = []; const seen = new Set();
   for (const { f } of cand.slice(0, q.labels)) {
     const p = view.project(f.x, f.y + view.headY(f), f.z); if (!p.ok) continue;
-    if (p.x < -40 || p.x > cssW + 40 || p.y < 0 || p.y > cssH) continue;
-    // skip labels that would sit on top of one already placed (crowds)
-    if (placed.some((o) => Math.abs(o.x - p.x) < u * 9 && Math.abs(o.y - p.y) < u * 4)) continue;
-    placed.push(p);
-    const info = f.info || {}, bot = f.flags & FLAG.bot;
-    const name = (bot ? '🤖 ' : f.flags & FLAG.crown ? '👑 ' : '') + info.name;
-    hg.font = `800 ${fs}px -apple-system, "Segoe UI", Roboto, sans-serif`;
-    const tw = Math.min(hg.measureText(name).width, u * 30), h = fs * 1.35, y = p.y - h * 0.9;
-    hg.fillStyle = bot ? 'rgba(40,40,60,0.72)' : 'rgba(14,6,34,0.78)';
-    rr(p.x - tw / 2 - u * 1.4, y - h / 2, tw + u * 2.8, h, h / 2); hg.fill();
+    if (p.x < -40 || p.x > cssW + 40 || p.y < cssH * 0.1 || p.y > cssH * 0.8) continue;
+    if (p.y < cssH * 0.2 && Math.abs(p.x - cssW / 2) < u * 12) continue;   // keep the timer ring clear
+    // overlapping a tag already placed -> fade this one out (smoothly), never stack
+    const hidden = placed.some((o) => Math.abs(o.x - p.x) < u * 11 && Math.abs(o.y - p.y) < u * 3.6);
+    const key = f.id; seen.add(key);
+    const target = hidden ? 0 : crowded && f.flags & FLAG.bot ? 0.45 : 0.92;
+    const a = (tagAlpha.get(key) ?? 0) + (target - (tagAlpha.get(key) ?? 0)) * 0.25; tagAlpha.set(key, a);
+    if (a < 0.04) continue;
+    if (!hidden) placed.push(p);
+    const info = f.info || {};
+    const name = (f.flags & FLAG.crown ? '👑' : '') + shortName(f.flags & FLAG.bot ? String(info.name || '').replace(/^Bot\s+/i, '') : info.name, crowded ? 8 : 10);
+    const tw = hg.measureText(name).width, h = fsz * 1.3, y = p.y - h * 0.6;
+    hg.globalAlpha = a;
+    hg.fillStyle = 'rgba(10,6,24,0.55)'; rr(p.x - tw / 2 - u, y - h / 2, tw + u * 2, h, h / 2); hg.fill();
     hg.fillStyle = '#' + ((info.color ?? 0xffffff) >>> 0).toString(16).padStart(6, '0');
-    rr(p.x - tw / 2 - u * 1.4, y - h / 2, u * 0.9, h, u * 0.45); hg.fill();
-    hg.fillStyle = bot ? '#c8c8d8' : '#fff';
-    hg.fillText(name, p.x + u * 0.2, y + 1, u * 30);
-    // HP bar
-    const bw = Math.max(u * 9, tw * 0.8), bh = u * 1.0, by = y + h / 2 + u * 0.5;
-    hg.fillStyle = 'rgba(0,0,0,0.6)'; rr(p.x - bw / 2 - 1, by - 1, bw + 2, bh + 2, bh); hg.fill();
-    hg.fillStyle = f.hp > 55 ? '#3ee07a' : f.hp > 28 ? '#ffd23f' : '#ff4d5e'; rr(p.x - bw / 2, by, (bw * Math.max(0, f.hp)) / 100, bh, bh / 2); hg.fill();
-    if (f.charge > 0) { hg.fillStyle = '#ffcf3a'; hg.fillRect(p.x - bw / 2, by + bh + 1.5, (bw * f.charge) / 100, u * 0.45); }
-  }
-  // damage numbers
-  for (let i = dmgNums.length - 1; i >= 0; i--) {
-    const d = dmgNums[i], k = (now - d.t0) / 0.85;
-    if (k >= 1 || k < 0) { dmgNums.splice(i, 1); continue; }
-    const p = view.project(d.x, d.y + 1.2, d.z); if (!p.ok) continue;
-    const pop = 1 + 0.9 * Math.pow(Math.max(0, 1 - k * 4), 2);
-    const size = u * (d.c ? 6.2 : d.s ? 3 : 4.2) * pop;
-    hg.font = `900 ${size}px -apple-system, "Segoe UI", Roboto, sans-serif`;
-    hg.globalAlpha = Math.min(1, (1 - k) * 2.2);
-    const y = p.y - k * u * 9, x = p.x + (d.c ? 0 : ((d.v * 7) % 5 - 2) * u);
-    hg.lineWidth = size * 0.18; hg.strokeStyle = 'rgba(40,0,40,0.85)'; hg.strokeText((d.c ? d.v + '!' : d.v), x, y);
-    hg.fillStyle = d.c ? '#ffe03a' : d.s ? '#d59bff' : '#ffffff'; hg.fillText((d.c ? d.v + '!' : d.v), x, y);
+    hg.fillText(name, p.x, y + 1);
+    // a hairline health bar only once hurt (no numbers)
+    if (f.hp < 99) { const bw = Math.max(u * 6, tw * 0.7), by = y + h / 2 + u * 0.35; hg.fillStyle = 'rgba(0,0,0,0.5)'; hg.fillRect(p.x - bw / 2, by, bw, u * 0.55); hg.fillStyle = f.hp > 55 ? '#3ee07a' : f.hp > 28 ? '#ffd23f' : '#ff4d5e'; hg.fillRect(p.x - bw / 2, by, (bw * Math.max(0, f.hp)) / 100, u * 0.55); }
   }
   hg.globalAlpha = 1;
+  if (tagAlpha.size > 200) for (const k of tagAlpha.keys()) if (!seen.has(k)) tagAlpha.delete(k);
+}
+// the one HUD element: a small timer ring (lobby countdown / storm timer) with the fighters-left count inside
+let ringMax = { lobby: 20, battle: 30 }, ringPhase = '';
+function drawRing(now, u) {
+  const w = world, ph = w.phase;
+  if (ph !== ringPhase) { ringPhase = ph; ringMax[ph] = Math.max(1, w.tl || 1); }
+  if (w.tl > ringMax[ph]) ringMax[ph] = w.tl;
+  const cx = cssW / 2, cy = cssH * 0.135, r = u * 4.6;
+  const k = ph === 'ceremony' ? 1 : Math.max(0, Math.min(1, (w.tl || 0) / (ringMax[ph] || 1)));
+  const col = ph === 'battle' ? (w.tl > 0 ? '#ff6b8b' : '#c77dff') : ph === 'ceremony' ? '#ffd34d' : '#7ee0ff';
+  const urgent = ph === 'lobby' && w.tl > 0 && w.tl <= 5;
+  const pulse = urgent ? 1 + 0.12 * Math.max(0, Math.sin((w.tl % 1) * Math.PI)) : 1;
+  hg.save(); hg.translate(cx, cy); hg.scale(pulse, pulse);
+  hg.fillStyle = 'rgba(10,6,24,0.55)'; hg.beginPath(); hg.arc(0, 0, r + u * 0.9, 0, Math.PI * 2); hg.fill();
+  hg.lineWidth = u * 1.1; hg.lineCap = 'round';
+  hg.strokeStyle = 'rgba(255,255,255,0.18)'; hg.beginPath(); hg.arc(0, 0, r, 0, Math.PI * 2); hg.stroke();
+  hg.strokeStyle = urgent ? '#ffd34d' : col; hg.beginPath(); hg.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); hg.stroke();
+  hg.textAlign = 'center'; hg.textBaseline = 'middle'; hg.fillStyle = '#fff';
+  if (ph === 'ceremony') { hg.font = `${Math.round(u * 4.2)}px sans-serif`; hg.fillText('👑', 0, u * 0.2); }
+  else { hg.font = `900 ${Math.round(u * (urgent ? 4.4 : 3.6))}px -apple-system, "Segoe UI", Roboto, sans-serif`; hg.fillText(String(urgent ? Math.ceil(w.tl) : ph === 'battle' ? w.n : w.fighters.length), 0, u * 0.3); }
+  hg.restore();
 }
 function rr(x, y, w, h, r) { hg.beginPath(); hg.moveTo(x + r, y); hg.arcTo(x + w, y, x + w, y + h, r); hg.arcTo(x + w, y + h, x, y + h, r); hg.arcTo(x, y + h, x, y, r); hg.arcTo(x, y, x + w, y, r); hg.closePath(); }
 
 // ------------------------------------------------------------------ DOM HUD (4x a second)
 let lastCount = -1;
-function domHud(now) {
-  const w = world, pill = $('pill');
-  let txt = '';
-  if (w.phase === 'lobby') txt = `ROUND ${w.round} · STARTS IN ${Math.ceil(w.tl)}s · ${w.fighters.length} IN`;
-  else if (w.phase === 'battle') txt = `⚔️ ${w.n} ALIVE · ${w.tl > 0 ? 'storm in ' + Math.ceil(w.tl) + 's' : '🌀 STORM CLOSING'}`;
-  else txt = `🏆 ROUND ${w.round} WINNER`;
-  if (pill.__t !== txt) { $('pillTxt').textContent = txt; pill.__t = txt; }
-  pill.className = w.phase;
-  const qe = $('queue'); qe.hidden = !(w.q > 0); if (w.q > 0) qe.textContent = `+${w.q} waiting for the next round`;
-  $('likeN').textContent = w.hype || 0; $('likeBar').style.width = Math.min(100, ((w.hype || 0) / 300) * 100) + '%';
-  // last 5 seconds of the lobby: big countdown
-  const c = $('count');
-  if (w.phase === 'lobby' && w.tl <= 5.0 && w.tl > 0) { const n = Math.ceil(w.tl); if (n !== lastCount) { lastCount = n; c.hidden = false; c.textContent = n; c.classList.remove('tick'); void c.offsetWidth; c.classList.add('tick'); audio.sfx('beep'); } }
-  else { if (!c.hidden) c.hidden = true; lastCount = -1; }
+function domHud() {
+  const w = world;
+  // countdown beeps for the last 5 seconds of the lobby (the ring shows the number)
+  if (w.phase === 'lobby' && w.tl <= 5.0 && w.tl > 0) { const n = Math.ceil(w.tl); if (n !== lastCount) { lastCount = n; audio.sfx('beep'); } } else lastCount = -1;
   if (w.phase !== 'ceremony') $('winner').hidden = true;
-  renderBoard(now);
 }
 
 // ------------------------------------------------------------------ timers that follow the virtual clock in render mode
 const timers = [];
 function later(fn, ms) { if (!RENDER) return setTimeout(fn, ms); const t = { at: vclock + ms / 1000, fn }; timers.push(t); return t; }
 function runTimers() { for (let i = timers.length - 1; i >= 0; i--) if (timers[i].at <= vclock) { const t = timers.splice(i, 1)[0]; t.fn(); } }
-function showNotice(t) { const n = $('notice'); n.textContent = t; n.hidden = false; }
+function showNotice() { $('notice').hidden = false; }   // a small spinner icon, no words
 function hideNotice() { $('notice').hidden = true; }
 
 // ------------------------------------------------------------------ main loop + auto quality
@@ -404,7 +372,7 @@ function tick(dt, now) {
   if (LOCAL) pumpLocalSay(now);
   if (view && !paused) { try { view.frame(world, dt, now); } catch (e) { N.err++; mark('frame-err'); if (N.err > 30) to2D(); } }
   drawHud(now);
-  if (now - domT > 0.25) { domT = now; domHud(now); }
+  if (now - domT > 0.25) { domT = now; domHud(); }
 }
 function autoQuality(now) {
   frames++;
@@ -432,6 +400,7 @@ if (RENDER) {
   audio.clock = () => vclock;
   window.__render = {
     async frame(dt) {
+      if (view && view.ready && !view.loaded && !view.error) await view.ready.catch(() => {});
       vclock += dt; runTimers();
       // a voice line being made pauses the clock (so the voice lands exactly where it would live)
       for (let i = 0; i < 100 && (pumpLocalSay.busy || (sayQ.length && sayQ[0].p && sayPending)); i++) await new Promise((r) => setTimeout(r, 30));
@@ -457,7 +426,6 @@ function maybeTikFinity(t) {
 let diag = null;
 makeView();
 resize();
-renderGifts();
 if (LOCAL) { startLocal(); board = { session: [], all: [] }; } else connect();
 if (!RENDER) {
   requestAnimationFrame(loop);

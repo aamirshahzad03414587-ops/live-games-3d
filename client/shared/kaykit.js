@@ -60,6 +60,8 @@ function buildTemplate(gltf, name) {
     for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'skinIndex', 'skinWeight'].includes(k)) g.deleteAttribute(k);
     // de-quantize up front (meshopt/quantized ints) so transforms and merging work on plain floats
     for (const k of Object.keys(g.attributes)) { const a = g.attributes[k], n = a.itemSize; const arr = k === 'skinIndex' ? new Uint16Array(a.count * n) : new Float32Array(a.count * n); for (let i = 0; i < a.count; i++) for (let c = 0; c < n; c++) arr[i * n + c] = k === 'skinIndex' ? a.getComponent(i, c) : GET[c].call(a, i); g.setAttribute(k, new BufferAttribute(arr, n)); }
+    if (!g.attributes.normal) g.computeVertexNormals();
+    if (!g.attributes.uv) g.setAttribute('uv', new BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
     return g;
   };
   for (const sm of skinned) {
@@ -96,6 +98,9 @@ function buildTemplate(gltf, name) {
   geo.computeBoundingBox(); geo.boundingSphere = new Sphere(new Vector3(0, 1.1, 0), 1.9);
   const tpl = new Group(); tpl.name = name;
   const rootBone = (() => { let r = bones[0]; while (r.parent && r.parent.isBone) r = r.parent; return r; })();
+  // the rigid accessories were baked into the merged mesh: drop the originals from the bone tree (else every clone draws them again)
+  const strays = []; rootBone.traverse((o) => { if (o.isMesh) strays.push(o); });
+  for (const o of strays) { o.parent.remove(o); o.geometry.dispose(); }
   tpl.add(rootBone);
   const mesh = new SkinnedMesh(geo, mats.length > 1 ? mats.map((x) => x.mat) : mats[0].mat);
   mesh.frustumCulled = true;

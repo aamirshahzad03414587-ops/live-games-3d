@@ -1,10 +1,28 @@
-// Announcer: turns Battle Royale events into short hype lines (shown as a banner and spoken by the free TTS voice).
+// Announcer: turns Battle Royale events into short hype lines spoken by the free TTS voice. Nothing is written on
+// screen any more, so the voice also explains how to play and what every gift does (rotating tips in quiet moments).
 // Shared by the server (LIVE) and the overlay's local/demo mode. Every line has a priority; the caller keeps at most a
 // few pending lines and drops stale low-priority ones, so the voice never lags behind the action.
 const pick = (arr, rng = Math.random) => arr[Math.floor(rng() * arr.length) % arr.length];
 
 export function makeAnnouncer({ nameOf, rng = Math.random }) {
   const joins = []; let joinAt = 0; let lastLeft = 99;
+  // how-to + gift guide, spoken in turn whenever nothing else was said for a while
+  const TIPS = {
+    lobby: [
+      'To play, just comment anything. You drop into the arena with your own fighter.',
+      'Gifts give powers! A rose is a speed boost. Five coins calls meteors. Thirty coins makes you a giant.',
+      'A one hundred coin gift revives you. Five hundred coins nukes the storm!',
+      'Follow for extra armor. Share the live for rage mode, double damage!',
+    ],
+    battle: [
+      'Comment attack and a name to hunt someone down!',
+      'Type shield to block, or dash to charge!',
+      'Likes heal everybody! Keep tapping that screen!',
+      'Comment revenge to go after whoever knocked you out last time!',
+      'Send a gift for a power up right now!',
+    ],
+  };
+  let phase = 'lobby', lastSaid = -99, tipAt = 0, tipN = { lobby: 0, battle: 0 };
   const L = (text, pri, banner, extra = {}) => ({ text, pri, banner: banner || null, ...extra });
   return {
     /** events -> lines [{ text, pri, banner }] (banner = big on-screen word, optional) */
@@ -14,7 +32,8 @@ export function makeAnnouncer({ nameOf, rng = Math.random }) {
         const A = e.a ? nameOf(e.a) : null, B = e.b ? nameOf(e.b) : null;
         switch (e.k) {
           case 'phase':
-            if (e.ph === 'lobby') { lastLeft = 99; out.push(L(pick(['New round! Comment anything to drop into the arena!', 'Lobby is open! Type join to jump in!', 'Next battle starting soon. Comment to join the fight!'], rng), 5)); }
+            phase = e.ph;
+            if (e.ph === 'lobby') { lastLeft = 99; tipN.lobby = 0; out.push(L(pick(['New round! Comment anything to drop into the arena!', 'Lobby is open! Comment anything to jump in!', 'Next battle starting soon. Comment to join the fight!'], rng), 5)); }
             if (e.ph === 'battle') out.push(L(pick([`Fight! ${e.n} fighters, only one survives!`, `Let the battle begin! ${e.n} fighters enter, one walks out!`, `Go go go! ${e.n} fighters in the arena!`], rng), 7, 'FIGHT!'));
             break;
           case 'storm':
@@ -71,6 +90,13 @@ export function makeAnnouncer({ nameOf, rng = Math.random }) {
         const more = names.length - shown.length;
         const list = shown.length === 1 ? shown[0] : shown.slice(0, -1).join(', ') + ' and ' + shown[shown.length - 1];
         out.push(L(more > 0 ? `Welcome ${shown.join(', ')} and ${more} more! Get ready to fight!` : pick([`Welcome ${list}! You are in the arena!`, `${list} just dropped in!`], rng), 3));
+      }
+      if (out.length) lastSaid = t;
+      // quiet for a while: one short tip (how to play / what gifts do)
+      const list = TIPS[phase];
+      if (list && !out.length && t - lastSaid > (phase === 'lobby' ? 5 : 11) && t - tipAt > (phase === 'lobby' ? 6 : 16)) {
+        tipAt = t; lastSaid = t;
+        out.push(L(list[tipN[phase]++ % list.length], 2, null, { tip: 1 }));
       }
       return out;
     },
