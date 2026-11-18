@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Battle Royale">
+<meta name="theme-color" content="#140b2b">
+<title>Viewer Battle Royale · LIVE</title>
+<link rel="stylesheet" href="/br/br.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl"></canvas>
+  <div id="vignette"></div>
+  <canvas id="hud"></canvas>
+  <div id="flash"></div>
+
+  <div id="howto">
+    <div class="title">💬 COMMENT TO JOIN!</div>
+    <div class="chips"><span>⚔️ attack NAME</span><span>🛡️ shield</span><span>💨 dash</span><span>❤️ likes = heal</span></div>
+  </div>
+  <div id="pill"><span id="pillTxt">Connecting…</span></div>
+  <div id="queue" hidden></div>
+
+  <div id="left">
+    <div id="board" hidden><div class="bh" id="boardTitle">🏆 TODAY'S CHAMPS</div><ol id="boardList"></ol></div>
+    <div id="feed"></div>
+    <div id="toasts"></div>
+  </div>
+
+  <div id="right">
+    <div class="gh">🎁 GIFT POWERS</div>
+    <div id="gifts"></div>
+    <div class="perk">➕ Follow = +30 armor</div>
+    <div class="perk">🔁 Share = rage mode</div>
+    <div id="likes"><div class="lt">❤️ <b id="likeN">0</b>/300 like rain</div><div class="bar"><i id="likeBar"></i></div></div>
+  </div>
+
+  <div id="count" hidden></div>
+  <div id="banner" hidden></div>
+  <div id="winner" hidden><div class="w1">🏆 WINNER 🏆</div><div class="w2" id="winName"></div><div class="w3" id="winSub"></div></div>
+  <div id="say" hidden></div>
+  <button id="soundChip" hidden>🔊 Tap for sound</button>
+  <div id="notice" hidden></div>
+  <div id="conn" title="LIVE connection"></div>
+</div>
+<script src="/br/app.js"></script>
+</body>
+</html>

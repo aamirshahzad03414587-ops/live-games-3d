@@ -1,0 +1,57 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { Board } from '../src/board.js';
+import { sanitizeDiag } from '../src/diag.js';
+import WebSocket from 'ws';
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs';
+
+test('board: signed copy restores after a restart, forged copy is refused', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lg-'));
+  const a = new Board(path.join(dir, 'a.json'), 'secret');
+  a.record({ players: [{ uid: 'sara', name: 'Sara', kills: 3, place: 1 }, { uid: 'bot:x', name: 'Bot X', bot: true, kills: 9, place: 2 }] });
+  assert.equal(a.top()[0].name, 'Sara'); assert.equal(a.top().length, 1, 'bots never on the board');
+  const { json, sig } = a.exportSigned();
+  const b = new Board(path.join(dir, 'b.json'), 'secret');
+  assert.equal(b.restore(json, sig), true); assert.equal(b.top()[0].wins, 1);
+  const c = new Board(path.join(dir, 'c.json'), 'secret');
+  assert.equal(c.restore(json.replace('"wins":1', '"wins":99'), sig), false);
+  assert.equal(new Board(path.join(dir, 'd.json'), 'other').restore(json, sig), false);
+});
+
+test('diag keeps only safe fields', () => {
+  const d = sanitizeDiag({ id: 'abc', reason: 'tick', mode: { kind: 'webgl', game: 'br', q: 1, fps: 29.5 }, gl: { calls: 22, tris: 40000, evil: 'x' }, secret: 'k', url: 'http://x?key=1' });
+  assert.equal(d.gl.calls, 22); assert.equal(d.gl.evil, undefined); assert.equal(d.secret, undefined); assert.equal(d.url, undefined);
+});
+
+test('server: pages, admin key, sim events reach the game over the websocket', async (t) => {
+  const port = 39000 + Math.floor(Math.random() * 900);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lg-'));
+  const srv = spawn(process.execPath, ['src/server.js'], { env: { ...process.env, PORT: String(port), ADMIN_KEY: 'test-key-123', TTS: '0', TTS_SELFTEST: '0', DATA_DIR: dir, TIKTOK_USERNAME: '' }, stdio: 'pipe' });
+  t.after(() => srv.kill());
+  await new Promise((r) => srv.stdout.on('data', (d) => /Live Games 3D on/.test(d) && r()));
+  const base = `http://127.0.0.1:${port}`;
+  assert.equal((await fetch(base + '/br')).status, 200);
+  assert.equal((await fetch(base + '/br/app.js')).status, 200);
+  assert.equal((await fetch(base + '/healthz')).status, 200);
+  assert.equal((await fetch(base + '/admin')).status, 401);
+  assert.equal((await fetch(base + '/admin?key=wrong')).status, 401);
+  assert.equal((await fetch(base + '/admin?key=test-key-123')).status, 200);
+  assert.equal((await fetch(base + '/api/admin/status')).status, 401);
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?game=br`);
+  const msgs = [];
+  ws.on('message', (m) => msgs.push(JSON.parse(m)));
+  await new Promise((r) => ws.on('open', r));
+  const post = (p, b) => fetch(base + '/api/admin' + p, { method: 'POST', headers: { 'content-type': 'application/json', 'x-admin-key': 'test-key-123' }, body: JSON.stringify(b) }).then((r) => r.json());
+  const r = await post('/sim/chat', { name: 'Sara', text: 'join' });
+  assert.equal(r.ok, true);
+  await new Promise((res) => setTimeout(res, 600));
+  assert.equal(msgs[0].t, 'hello');
+  assert.ok(msgs.some((m) => m.t === 'roster' && m.add.some((a) => a.name === 'Sara')), 'Sara is in the arena');
+  assert.ok(msgs.some((m) => m.t === 's' && m.f.length >= 8), 'snapshots stream');
+  const st = await fetch(base + '/api/admin/status', { headers: { 'x-admin-key': 'test-key-123' } }).then((x) => x.json());
+  assert.ok(st.br.humans >= 1);
+  ws.close();
+});

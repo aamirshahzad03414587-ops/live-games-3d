@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Games 3D · Admin</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#120a26;color:#eee}
+header{padding:14px 18px;background:linear-gradient(90deg,#4a1f7e,#7a2a8a);font-weight:800;font-size:19px}
+main{display:grid;grid-template-columns:minmax(300px,1fr) 380px;gap:16px;padding:16px;max-width:1200px;margin:auto}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+section{background:#1d1338;border:1px solid #3a2a66;border-radius:14px;padding:14px;margin-bottom:14px}
+h2{font-size:15px;margin:0 0 10px;color:#ffd36a}
+button{background:#6a3cff;color:#fff;border:0;border-radius:10px;padding:9px 12px;margin:3px;font-weight:700;cursor:pointer}
+button.alt{background:#2c2150} button.red{background:#c22b4b} button.gold{background:#d99a1c;color:#2a1600}
+input,select{background:#120a26;color:#fff;border:1px solid #4a3a7a;border-radius:8px;padding:8px;margin:3px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:4px} .k{opacity:.7;font-size:13px}
+code{background:#120a26;padding:2px 6px;border-radius:6px;word-break:break-all}
+pre{background:#120a26;padding:10px;border-radius:10px;font-size:12px;max-height:240px;overflow:auto;white-space:pre-wrap}
+iframe{width:100%;aspect-ratio:9/16;border:0;border-radius:14px;background:#000}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#888;margin-right:6px}.dot.connected{background:#2ee67a}.dot.waiting,.dot.connecting{background:#ffb020}.dot.error{background:#ff4040}
+</style></head><body>
+<header>🎮 Live Games 3D · Admin</header>
+<main>
+<div>
+  <section><h2>📱 Overlay for the iPhone</h2>
+    <div class="k">Open this on the iPhone you stream from (Safari → Share → Add to Home Screen for full screen), tap once for sound, then go LIVE with screen share.</div>
+    <p><code id="ovl"></code> <button class="alt" onclick="copy(ovl.textContent)">Copy</button></p>
+    <div class="k">PC + LIVE Studio with TikFinity (forwards events, keep this link private):</div>
+    <p><code id="ovlPc"></code> <button class="alt" onclick="copy(ovlPc.textContent)">Copy</button></p>
+  </section>
+  <section><h2>📡 TikTok LIVE connection</h2>
+    <div><span class="dot" id="ttDot"></span><b id="ttState">…</b> <span class="k" id="ttMsg"></span></div>
+    <div class="row"><input id="user" placeholder="@username"><select id="src"><option value="direct">direct (server reads the LIVE)</option><option value="tikfinity">tikfinity (PC app)</option><option value="both">both</option></select>
+    <button onclick="connectTT()">Connect</button><button class="alt" onclick="api('/tiktok/disconnect')">Disconnect</button><button class="alt" onclick="api('/new-stream')">New LIVE (reset session)</button></div>
+  </section>
+  <section><h2>⚔️ Battle Royale</h2>
+    <pre id="game">…</pre>
+    <div class="row"><button class="gold" onclick="api('/br/skip')">Skip phase</button><button class="red" onclick="if(confirm('Reset the all-time leaderboard?'))api('/br/reset-board')">Reset all-time board</button></div>
+    <div class="row"><label class="k">Lobby s <input id="lobby" type="number" style="width:60px"></label><label class="k">Arena cap <input id="cap" type="number" style="width:60px"></label><label class="k">Bots fill to <input id="minf" type="number" style="width:60px"></label><label class="k"><input id="bots" type="checkbox"> bots</label><label class="k"><input id="voice" type="checkbox"> voice</label><button onclick="save()">Save</button></div>
+  </section>
+  <section><h2>🧪 Test events</h2>
+    <div class="row"><input id="nm" value="Tester" style="width:120px"><input id="txt" value="join" style="width:150px"><button onclick="sim('chat',{text:txt.value})">Comment</button><button class="alt" onclick="sim('like',{count:15})">Like ×15</button><button class="alt" onclick="sim('follow')">Follow</button><button class="alt" onclick="sim('share')">Share</button></div>
+    <div class="row"><button class="alt" onclick="sim('gift',{giftName:'Rose',coins:1})">🌹 Rose 1</button><button class="alt" onclick="sim('gift',{giftName:'Finger Heart',coins:5})">☄️ 5</button><button class="alt" onclick="sim('gift',{giftName:'Doughnut',coins:30})">🦖 30</button><button class="alt" onclick="sim('gift',{giftName:'Hand Hearts',coins:100})">💖 100</button><button class="alt" onclick="sim('gift',{giftName:'Money Gun',coins:500})">☢️ 500</button></div>
+    <div class="row"><span class="k">Fake crowd:</span><button onclick="crowd('quiet')">3 viewers</button><button onclick="crowd('busy')">Busy (200+)</button><button onclick="crowd('gifts')">Gift storm</button><button class="red" onclick="crowd('off')">Stop</button> <span class="k" id="crowdSt"></span></div>
+  </section>
+  <section><h2>🔊 Voice + recent events</h2><button class="alt" onclick="api('/voice-check').then(r=>vc.textContent=JSON.stringify(r,null,1))">Test free voices</button><pre id="vc"></pre><pre id="feed"></pre></section>
+</div>
+<div><section><h2>👀 Preview (muted)</h2><iframe id="prev"></iframe></section></div>
+</main>
+<script>
+const key = new URLSearchParams(location.search).get('key') || '';
+const H = { 'content-type': 'application/json', 'x-admin-key': key };
+const $ = (id) => document.getElementById(id);
+const api = (p, body) => fetch('/api/admin' + p, p === '/status' ? { headers: H } : { method: 'POST', headers: H, body: JSON.stringify(body || {}) }).then((r) => r.json());
+const sim = (type, extra = {}) => api('/sim/' + type, { name: $('nm').value, ...extra });
+const crowd = (mode) => api('/crowd', { mode, minutes: 10 });
+const copy = (t) => navigator.clipboard && navigator.clipboard.writeText(t);
+function connectTT() { api('/settings', { tiktok: { username: $('user').value, liveSource: $('src').value } }).then(() => api('/tiktok/connect', { username: $('user').value })); }
+function save() { api('/settings', { br: { lobbySeconds: +$('lobby').value, arenaCap: +$('cap').value, minFighters: +$('minf').value, bots: $('bots').checked }, voice: { enabled: $('voice').checked } }); }
+const base = location.origin;
+$('ovl').textContent = base + '/br';
+$('ovlPc').textContent = base + '/br?mode=pc&key=' + key;
+$('prev').src = '/br?mute=1&diag=0&mode=pc&fps=30';
+let first = true;
+async function poll() {
+  try {
+    const s = await api('/status');
+    const t = s.tiktok; $('ttDot').className = 'dot ' + t.state; $('ttState').textContent = `${t.state} · @${t.username || '-'} · ${t.source}`; $('ttMsg').textContent = t.message || '';
+    $('game').textContent = JSON.stringify(s.br, null, 1);
+    $('feed').textContent = (s.feed || []).map((f) => new Date(f.at).toLocaleTimeString() + ' ' + f.source + ' ' + f.type).reverse().join('\n');
+    $('crowdSt').textContent = s.crowd ? `${s.crowd.mode}, ${s.crowd.left}s left` : '';
+    if (first) { first = false; $('user').value = s.settings.tiktok.username || ''; $('src').value = s.settings.tiktok.liveSource || 'direct'; $('lobby').value = s.settings.br.lobbySeconds; $('cap').value = s.settings.br.arenaCap; $('minf').value = s.settings.br.minFighters; $('bots').checked = s.settings.br.bots; $('voice').checked = s.settings.voice.enabled; }
+  } catch (e) {}
+  setTimeout(poll, 2000);
+}
+poll();
+</script></body></html>

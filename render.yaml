@@ -1,0 +1,23 @@
+# One free Render web service for all the LIVE games (/br now, /tower and /siege later).
+services:
+  - type: web
+    name: live-games-3d
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: ADMIN_KEY
+        generateValue: true
+      - key: TIKTOK_USERNAME
+        sync: false
+      # direct (server reads the LIVE) | tikfinity (PC app) | both
+      - key: LIVE_SOURCE
+        sync: false
+      # optional Euler Stream key (eulerstream.com) if TikTok blocks unsigned connections
+      - key: SIGN_API_KEY
+        sync: false
