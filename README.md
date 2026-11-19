@@ -71,6 +71,10 @@ Mistress, voice `en-US-AvaNeural`). Go LIVE exactly like the Battle Royale, just
 - **Nothing to read on screen**: Mira speaks how to play, what each gift does, every riddle and every event. On screen:
   short name tags, the door numbers, a vote bar under each door, a small ring (time left + lantern oil, ❓ during a
   riddle) and the top climber's name at the end.
+- **Straight into action**: no intro; each run opens on the gathering hall for ~9 s and the party is already walking
+  to the first doors. Monsters are dark, glowing-eyed **Quaternius** creatures (CC0): a horned skull wraith with
+  burning eye sockets, a winged blood-red demon and a trident-wielding demon lord as the floor boss (small gold crown),
+  with roars on arrival, aggressive attack/taunt animations, red fog, embers and screen shake on boss slams.
 - **Comment anything** → you join the climb as a lantern-carrying KayKit adventurer (Knight, Barbarian, Mage, Rogue)
   tinted in your colour; fallen climbers float behind as see-through ghosts; ghost monsters are spectral skeletons.
 - **Vote a door**: `1` `2` `3` (also `1️⃣`, `one`, `door 2`, `left` / `right` / `middle`) during the 12 s vote. The
@@ -107,14 +111,16 @@ Go LIVE exactly like the other games, just open `/siege`.
 every event. On screen: short name tags, a small ring (time + Ascension barrier), a 🌍 survivors counter, a thin boss
 bar and two icon bars during the story vote. Defenders are KayKit adventurers (mage = Mage, warrior = Barbarian, archer
 = Rogue, healer = Knight), the hordes are KayKit skeletons (baked flip-book poses, one instanced draw per pose), the
-bosses are giant KayKit figures, the city / wall / citadel are KayKit City, Halloween, Dungeon and Hexagon props.
+bosses and the dragon are Quaternius monsters, the city / wall / citadel are KayKit City, Halloween, Dungeon and Hexagon props.
 
-**The story** (full-bleed anime art with a slow push-in + narration, no words on screen; the full 6-card intro plays on the first session of a
-LIVE and every 3rd one after, a 2-card recap otherwise): the Dark Dimension, a magic underworld, clashed with Earth.
-A grieving scientist, denied the AIDS cure for his daughter by a greedy boss, his wife and journalist brother gone,
-was corrupted by an ancient book and a dark teleport stone and opened the rift at Earth's core. A hidden Mastermind
-stole 5 billion souls. The Lord of Earth sacrificed 1.5 billion to awaken the Ascension System. **1.5 billion
-survivors remain** (the giant counter), and they vanish unless the Dark Dimension is beaten.
+**Straight into action**: no story cards or lore art at the start (`SIEGE_INTRO` defaults to 0); each session opens
+on the wall with an 8 s gather and the first wave right after.
+Background lore (never written on screen): the Dark Dimension clashed with Earth, a corrupted scientist opened a
+rift, a hidden Mastermind stole 5 billion souls, and **1.5 billion survivors remain** (the 🌍 counter).
+
+**Menacing look**: blood-red sky and rift, ember particles, dark-tinted skeleton hordes with glowing red eyes, and
+Quaternius CC0 bosses (skull wraith → winged demon → demon lord Mastermind) plus a real dragon model with an
+evolved silhouette, all restyled with a dark/red "menace" palette and glowing eyes.
 
 - **Comment anything** → you join the citadel wall as a survivor (random class). Pick one: `mage` / `🔮` (fireballs,
   area), `warrior` / `⚔️` (holds the gate, melee), `archer` / `🏹` (fast arrows, hits fliers), `healer` / `💚`
@@ -190,6 +196,11 @@ pinned commits:
 | Halloween Bits 1.0 | [KayKit-Halloween-Bits-1.0](https://github.com/KayKit-Game-Assets/KayKit-Halloween-Bits-1.0) | `6dc69bf` | tower crypt props, pumpkins; siege graves, dead trees, fences, lamp posts, crypt |
 | City Builder Bits 1.0 | [KayKit-City-Builder-Bits-1.0](https://github.com/KayKit-Game-Assets/KayKit-City-Builder-Bits-1.0) | `6397691` | siege ruined city: buildings, cars, street lights |
 
+Monsters (Tower + Siege) are from **Quaternius – Ultimate Monsters Bundle** ([poly.pizza bundle](https://poly.pizza/bundle/Ultimate-Monsters-Bundle-5oyGWAmOB6), **CC0 1.0**):
+`Dragon_Evolved` (poly.pizza `LlwD0QNUPj`), `Demon` (`LnfIziKv4o`), `Demon2` / flying demon (`Mo2ky6vkf8`),
+`Ghost_Skull` (`TX8r9WBXpe`). Recoloured at runtime (`client/shared/monsters.js`); rebuild the optimised copies in
+`public/models/monsters/` with `node tools/assets/build-monsters.mjs` (sources in `../assets-src/quaternius-monsters`).
+
 Rebuild the optimised GLBs: `bash tools/assets/fetch.sh` (clones the packs into `../assets-src` at those commits),
 `node tools/assets/build-chars.mjs`, `node tools/assets/build-env.mjs br|tower|siege`.
 
@@ -212,7 +223,7 @@ Code: `public/shared/br-sim.js` (rules, isomorphic), `public/shared/commands.js`
 fortune-live), `src/tts.js` (free Edge voice + Google fallback, from fortune-live), `client/br/*` (overlay: 3D view,
 2D fallback, HUD). Tower: `public/shared/tower-{sim,data,lines}.js`, `src/games/tower.js`, `src/tower-board.js`,
 `client/tower/*`. Siege: `public/shared/siege-{sim,data,lines}.js`, `src/games/siege.js`, `src/siege-board.js`,
-`client/siege/*`, lore art `public/siege/lore-*.jpg`.
+`client/siege/*`, shared monster loader `client/shared/monsters.js`.
 
 Free hosting note: Render's free plan has 750 instance hours a month **shared by all free services**. fortune-live runs
 24/7 with a keep-alive (~720–744 h), so this service has **no keep-alive**: it sleeps after 15 min without visitors and
