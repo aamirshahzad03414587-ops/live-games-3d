@@ -15,7 +15,7 @@ export const FSHIFT = 2;   // f record: id, x, z, cls | flags << 2, hp
 export const SPH = ['intro', 'gather', 'chapter', 'wave', 'break', 'boss', 'victory', 'vote', 'choice', 'ending'];
 
 export const SIEGE_DEFAULTS = {
-  introSeconds: 1, gatherSeconds: 14, chapterSeconds: 4, breakSeconds: 5, victorySeconds: 4.5, voteSeconds: 16, choiceSeconds: 5.5, endingSeconds: 16,
+  introSeconds: 0, gatherSeconds: 8, chapterSeconds: 2, breakSeconds: 5, victorySeconds: 4.5, voteSeconds: 16, choiceSeconds: 5.5, endingSeconds: 16,
   minDefenders: 6, bots: true, waveCap: 70, bossCap: 100, sendCap: 70, enemySend: 90, enemyCap: 110,
   spawnMul: 1, enemyHpMul: 1, dmgMul: 1, lossPer: 950_000, likeBarrier: 0.06, likePulse: 500, startChapter: 1,
 };

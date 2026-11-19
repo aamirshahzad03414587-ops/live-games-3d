@@ -521,4 +521,4 @@ if (!RENDER) {
 window.__siegeUI = { get world() { return world; }, get members() { return world.members; }, get level() { return level; }, get fps() { return fps; }, get view() { return view; }, stats: () => (view ? view.stats() : null), N, audio, roster };
 
 // preload the lore art so the intro cards never pop in blank
-try { for (const L of LORE) { const im = new Image(); im.decoding = 'async'; im.src = `/siege/lore-${L.art}.jpg`; } } catch {}
+// (no story cold-open any more: the lore art is no longer preloaded)

@@ -23,13 +23,13 @@ export function defaults() {
       bots: env.BR_BOTS !== '0',
     },
     tower: {
-      gatherSeconds: num(env.TOWER_GATHER_SECONDS, 16), voteSeconds: num(env.TOWER_VOTE_SECONDS, 12), minParty: num(env.TOWER_MIN_PARTY, 6), bots: env.TOWER_BOTS !== '0',
+      gatherSeconds: num(env.TOWER_GATHER_SECONDS, 9), voteSeconds: num(env.TOWER_VOTE_SECONDS, 12), minParty: num(env.TOWER_MIN_PARTY, 6), bots: env.TOWER_BOTS !== '0',
       riddleSeconds: 22, bossSeconds: 32,
       voice: env.MIRA_VOICE || 'en-US-AvaNeural', rate: env.MIRA_RATE || '+4%', pitch: env.MIRA_PITCH || '-2Hz',
     },
     siege: {
-      gatherSeconds: num(env.SIEGE_GATHER_SECONDS, 14), voteSeconds: num(env.SIEGE_VOTE_SECONDS, 16), minDefenders: num(env.SIEGE_MIN_DEFENDERS, 6), bots: env.SIEGE_BOTS !== '0',
-      introSeconds: num(env.SIEGE_INTRO, 1), spawnMul: num(env.SIEGE_SPAWN_MUL, 1), enemyHpMul: num(env.SIEGE_ENEMY_HP_MUL, 1), dmgMul: 1,
+      gatherSeconds: num(env.SIEGE_GATHER_SECONDS, 8), voteSeconds: num(env.SIEGE_VOTE_SECONDS, 16), minDefenders: num(env.SIEGE_MIN_DEFENDERS, 6), bots: env.SIEGE_BOTS !== '0',
+      introSeconds: num(env.SIEGE_INTRO, 0), spawnMul: num(env.SIEGE_SPAWN_MUL, 1), enemyHpMul: num(env.SIEGE_ENEMY_HP_MUL, 1), dmgMul: 1,
       voice: env.NARRATOR_VOICE || 'en-US-ChristopherNeural', rate: env.NARRATOR_RATE || '-6%', pitch: env.NARRATOR_PITCH || '-10Hz',
     },
   };

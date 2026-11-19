@@ -15,6 +15,7 @@ import { DirectionalLight,
 import { THEMES, BOSS_THEME, GATE_THEME, FH, DOOR_Z, doorX, STAIR } from '../../public/shared/tower-data.js';
 import { TFLAG } from '../../public/shared/tower-sim.js';
 import { loadKit, tickActor } from '../shared/kaykit.js';
+import { loadMonsters } from '../shared/monsters.js';
 import { loadEnv } from '../shared/envkit.js';
 
 const HEROES = ['Knight', 'Barbarian', 'Mage', 'Rogue', 'Rogue_Hooded'];
@@ -50,11 +51,11 @@ export function createTowerView(canvas, opts = {}) {
   const toonG = (color, extra = {}) => keep(new MeshToonMaterial({ color, gradientMap: ramp, ...extra }));
 
   // ------------------------------------------------------------------ CC0 KayKit models (stream in; rooms are rebuilt with props once loaded)
-  let kit = null, env = null, disposed = false, loadErr = null;
-  const ready = Promise.all([loadEnv(opts.envUrl || '/models/env-tower.glb'), loadKit({ names: HEROES.concat(['Skeleton_Mage', 'Skeleton_Warrior']) })])
-    .then(([e, k]) => {
-      if (disposed) { e.dispose(); k.dispose(); return; }
-      env = e; kit = k;
+  let kit = null, env = null, mons = null, disposed = false, loadErr = null;
+  const ready = Promise.all([loadEnv(opts.envUrl || '/models/env-tower.glb'), loadKit({ names: HEROES.concat(['Skeleton_Mage', 'Skeleton_Warrior']) }), loadMonsters({ names: ['Ghost_Skull', 'Demon', 'Demon2'] })])
+    .then(([e, k, m]) => {
+      if (disposed) { e.dispose(); k.dispose(); m.dispose(); return; }
+      env = e; kit = k; mons = m;
       for (const r of rooms.values()) disposeRoom(r); rooms.clear();
       upgradeModels();
     }).catch((err) => { loadErr = err; throw err; });
@@ -254,7 +255,7 @@ export function createTowerView(canvas, opts = {}) {
       const dancers = inst(G.ghost, basic({ color: 0xc9b6ff, transparent: true, opacity: 0.32, depthWrite: false }), 4);
       anim.push((t) => { for (let i = 0; i < 4; i++) { const a = t * 0.35 + (i * TAU) / 4; put(dancers, i, Math.cos(a) * 6.8, 1.0 + Math.sin(t * 2 + i) * 0.25, Math.sin(a) * 6.8 - 0.5, 1.1, 1.6, 1.1, -a + Math.sin(t * 3 + i) * 0.4); } dancers.instanceMatrix.needsUpdate = true; });
     } else if (id === 'belfry') {
-      const bell = add(new Mesh(G.bell, mat({ color: 0xc9953a, emissive: 0x3a2400, side: DoubleSide }))); bell.position.set(0, FH - 3.6, -4.5); bell.scale.setScalar(1.5);
+      const bell = add(new Mesh(G.bell, mat({ color: 0xc9953a, emissive: 0x3a2400, side: DoubleSide }))); bell.position.set(0, FH - 2.4, -8.5); bell.scale.setScalar(1.1); bell.visible = false;   // (the giant demon boss needs the headroom)
       anim.push((t) => { bell.rotation.z = Math.sin(t * 1.6) * 0.25; });
       const win = inst(G.plane, basic({ color: 0x9fb4ff }), 2);
       put(win, 0, -9.3, 5, -1.5, 2, 3.2, 1, Math.PI / 2); put(win, 1, 9.3, 5, 1.5, 2, 3.2, 1, -Math.PI / 2);
@@ -350,14 +351,18 @@ export function createTowerView(canvas, opts = {}) {
     g.userData = { mouth, crown };
     M_.ghost = g; monster.add(g);
   }
-  // once the KayKit models stream in: wraiths are spectral skeleton mages, the boss a crowned giant skeleton warrior
-  let wraith = null, bossA = null;
+  const EYE_Y = Number(new URLSearchParams(location.search).get('eyeY')) || 2.55, EYE_Z = Number(new URLSearchParams(location.search).get('eyeZ')) || 2.2;
+  // once the models stream in: the wraith is a horned skull ghost, the boss a trident demon lord (small crown between
+  // the horns), the spider room a winged demon — CC0 Quaternius monsters restyled dark with glowing red eyes
+  let wraith = null, bossA = null, demonA = null;
   function upgradeModels() {
     const g = M_.ghost;
     for (const c of [...g.children]) if (c !== g.userData.crown) c.visible = false;
-    wraith = kit.actor('Skeleton_Mage', 'ghost'); wraith.obj.scale.setScalar(1.35); g.add(wraith.obj);
-    bossA = kit.actor('Skeleton_Warrior', 'ghost-boss'); bossA.obj.scale.setScalar(1.45); g.add(bossA.obj);
-    g.userData.crown.scale.setScalar(0.75);
+    wraith = mons.actor('Ghost_Skull'); wraith.obj.scale.setScalar(wraith.unit * 3.4); g.add(wraith.obj);
+    bossA = mons.actor('Demon'); bossA.obj.scale.setScalar(bossA.unit * 3.6); g.add(bossA.obj);
+    g.userData.crown.scale.setScalar(0.3);
+    const sp = M_.spider; for (const c of [...sp.children]) c.visible = false; sp.userData.legs = [];
+    demonA = mons.actor('Demon2'); demonA.obj.scale.setScalar(demonA.unit * 3.3); demonA.obj.position.y = 0.9; sp.add(demonA.obj);
   }
   { // spider
     const g = new Group(); const mm = toonG(0x2a1a2a, { emissive: 0x100008 }); hitMats.push(mm);
@@ -470,6 +475,7 @@ export function createTowerView(canvas, opts = {}) {
   let quality = { particles: 1, halos: true, maxChars: CAP };
   let time = 0, shake = 0, flashT = -9, lightning = -9, thunderAt = 0, curFloor = 0, baseY = 0, lastW = null;
   const camPos = new Vector3(0, 10, 20), camLook = new Vector3(0, 2.6, -2.4), tgtPos = new Vector3(), tgtLook = new Vector3();
+  const cRed = new Color(0x2a0606);
   const fogCol = new Color(0x1a1030), fogTgt = new Color(), lightCol = new Color(0xffb36b), lightTgt = new Color();
   let monVis = { kind: '', t0: 0, hitT: -9, atkT: -9, dieT: -9, x: 0, z: -4 };
   let chestT = -9, chestX = 0, bladeT = -9;
@@ -547,6 +553,7 @@ export function createTowerView(canvas, opts = {}) {
     // light + fog: thicker and darker as the lantern oil runs low; lightning in rooms with windows
     const fuel = Math.max(0, Math.min(100, w.fuel ?? 100)) / 100;
     fogTgt.setHex(T.fog).multiplyScalar(0.55 + 0.45 * fuel);
+    if (w.phase === 'monster' || w.phase === 'boss') fogTgt.lerp(cRed, w.phase === 'boss' ? 0.55 : 0.4);
     fogCol.lerp(fogTgt, Math.min(1, dt * 1.5));
     scene.fog.color.copy(fogCol); scene.background.copy(fogCol).multiplyScalar(0.6);
     scene.fog.far = 26 + 20 * fuel; scene.fog.near = 7 + 7 * fuel;
@@ -574,14 +581,14 @@ export function createTowerView(canvas, opts = {}) {
       tgtPos.set(dx * 0.35, baseY + 6.4, 13.8); tgtLook.set(dx * 0.6, baseY + 1.8, -4.2);
     } else if (w.phase === 'monster' || w.phase === 'boss') {
       const b = w.phase === 'boss';
-      tgtPos.set(Math.sin(now * 0.25) * 1.8, baseY + (b ? 8.6 : 7.0), b ? 17.5 : 15.2); tgtLook.set(0, baseY + (b ? 3.9 : 2.7), -3);
+      tgtPos.set(Math.sin(now * 0.25) * 1.4, baseY + (b ? 8.8 : 7.4), b ? 18.2 : 17.0); tgtLook.set(0, baseY + (b ? 3.9 : 2.7), -3);
     } else if (w.phase === 'end') {
       const a = now * 0.18; tgtPos.set(Math.sin(a) * 7, baseY + 4.4, 3 + Math.cos(a) * 7); tgtLook.set(0, baseY + 1.5, 2.4);
     } else if (w.phase === 'vote') {
       let lead = 0, mx = 0; (w.vc || []).forEach((v, i) => { if (v > mx) { mx = v; lead = i; } });
       const dx = mx ? doorPos(cur, lead) * 0.25 : 0;
-      tgtPos.set(dx * 0.6, baseY + 7.2, 15.8); tgtLook.set(dx, baseY + 2.4, -3.4);
-    } else { const a = now * 0.12; tgtPos.set(Math.sin(a) * 2.2, baseY + 6.6 + Math.sin(a * 0.7) * 0.6, 15.2); tgtLook.set(0, baseY + 1.9, -2.2); }
+      tgtPos.set(dx * 0.4, baseY + 7.6, 17.4); tgtLook.set(dx * 0.6, baseY + 2.4, -3.4);
+    } else { const a = now * 0.12; tgtPos.set(Math.sin(a) * 1.6, baseY + 6.9 + Math.sin(a * 0.7) * 0.6, 17.0); tgtLook.set(0, baseY + 1.9, -2.2); }
     const ck = Math.min(1, dt * (w.phase === 'climb' ? 3.2 : 2.2));
     if (camPos.distanceTo(tgtPos) > 30) { camPos.copy(tgtPos); camLook.copy(tgtLook); }
     camPos.lerp(tgtPos, ck); camLook.lerp(tgtLook, ck);
@@ -689,19 +696,26 @@ export function createTowerView(canvas, opts = {}) {
       monVis.x += (0 - monVis.x) * Math.min(1, dt * 2); monVis.z += ((boss ? -3.8 : -3.4) - monVis.z) * Math.min(1, dt * 2);
       const atk = Math.max(0, 1 - (now - monVis.atkT) / 0.6), lunge = Math.sin(Math.min(1, (now - monVis.atkT) / 0.6) * Math.PI) * 1.6;
       const hitK = Math.max(0, 1 - (now - monVis.hitT) / 0.18);
-      const scl = (boss ? 1.7 : 1.05) * (0.2 + 0.8 * em) * (1 + hitK * 0.06);
+      const scl = (boss ? 1.75 : 1.15) * (0.2 + 0.8 * em) * (1 + hitK * 0.06 + atk * 0.08);
       monster.position.set(monVis.x + (hitK > 0 ? (Math.random() - 0.5) * 0.15 : 0), baseY + (key === 'ghost' ? (wraith ? 0.25 : 0.4) + Math.sin(now * 1.8) * (wraith ? 0.15 : 0.3) : 0), monVis.z + lunge * (wraith && key === 'ghost' ? 0.4 : 1));
       monster.scale.setScalar(scl);
       monster.rotation.set(0, Math.sin(now * 0.8) * 0.15, key === 'ghost' ? Math.sin(now * 1.3) * 0.06 : 0);
       if (key === 'ghost' && wraith) {
         const a = boss ? bossA : wraith; wraith.obj.visible = !boss; bossA.obj.visible = boss;
-        g.userData.crown.position.set(0, 2.95 * 1.45 * 0.98, 0); g.userData.crown.visible = boss;
-        a.play(em < 1 ? 'spawn' : 'combat', now);
-        if (now - monVis.atkT < 0.05) a.play(boss ? (mo.slam ? 'spin' : 'slash') : 'cast', now);
-        if (now - monVis.hitT < 0.03 && now >= a.until) a.play('hit', now, { speed: 1.6 });
-        tickActor(kit, a, dt, now);
+        g.userData.crown.position.set(0.05, 3.32, 0.15); g.userData.crown.visible = boss;
+        if (em < 1 && a.state !== 'roar') a.play('roar', now); else if (!a.until) a.play('combat', now);
+        if (now - monVis.atkT < 0.05) a.play(boss ? (mo.slam ? 'spin' : 'slash') : 'attack', now, { speed: 1.25 });
+        else if (now - monVis.hitT < 0.03 && now >= a.until) a.play('hit', now, { speed: 1.6 });
+        else if (!a.until && Math.random() < dt * 0.25) a.play('taunt', now);   // restless, aggressive idle
+        a.tick(dt, now);
+        const gl = 0.75 + 0.25 * Math.sin(now * 6);
+        if (boss) halos.push([monVis.x, baseY + 3.0 * scl, monVis.z + 0.9, 1, 0.1, 0.03, gl * 0.75, 2.6]);   // red eye glare
+        else for (const sx of [-0.36, 0.36]) { halos.push([monVis.x + sx * scl, baseY + EYE_Y * scl, monVis.z + EYE_Z * scl, 1, 0.08, 0.02, gl, 0.9]); halos.push([monVis.x + sx * scl, baseY + EYE_Y * scl, monVis.z + (EYE_Z + 0.05) * scl, 1, 0.6, 0.3, gl, 0.28]); }   // burning eye sockets
       } else if (key === 'ghost') { const u = g.userData; u.crown.visible = boss; monGhostMat.color.setHex(boss ? 0xcab8ff : 0xe8ecff); monGhostMat.emissive.setHex(hitK > 0 ? 0xffffff : boss ? 0x3a1a6a : 0x2a2a60); u.mouth.scale.set(0.5, 0.42 + atk * 0.5 + Math.sin(now * 5) * 0.06, 0.2); }
       if (key === 'spider') g.userData.legs.forEach((L, i) => { L.rotation.x = Math.sin(now * 10 + i * 1.3) * 0.25 * (1 + atk); });
+      if (key === 'spider' && demonA) { if (now - monVis.atkT < 0.05) demonA.play('bite', now, { speed: 1.3 }); else if (now - monVis.hitT < 0.03 && now >= demonA.until) demonA.play('hit', now); else if (!demonA.until) demonA.play(atk > 0 ? 'move' : 'combat', now); demonA.tick(dt, now); halos.push([monVis.x, baseY + 2.9 * scl, monVis.z + 0.8, 1, 0.1, 0.03, 0.6, 1.6]); }
+      // embers + a blood-red haze while a monster is in the room
+      if (Math.random() < dt * (boss ? 22 : 12)) emit(glow, 1, monVis.x + (Math.random() - 0.5) * 9, baseY + 0.2, monVis.z + Math.random() * 6, { colors: [0xff6a20, 0xff3010, 0xffa040], up: 1.2, speed: 0.7, g: -0.8, life: 2.4, size: 0.14 });
       if (key === 'mimic') g.userData.lidP.rotation.x = -0.35 - Math.abs(Math.sin(now * 4)) * 0.5 - atk * 0.6;
       for (const hm of hitMats) hm.emissive.setHex(hitK > 0 ? 0x888888 : 0x100008);
       halos.push([monVis.x, baseY + 2.2 * scl, monVis.z + 0.5, boss ? 0.6 : 0.3, boss ? 0.3 : 1, boss ? 1 : 0.4, 0.35, boss ? 14 : 8]);
@@ -860,7 +874,7 @@ export function createTowerView(canvas, opts = {}) {
     drawn: () => drawn,
     thunder() { if (thunderAt && time >= thunderAt) { thunderAt = 0; return true; } return false; },
     stats() { const i = renderer.info; return { calls: i.render.calls, tris: i.render.triangles, tex: i.memory.textures, geo: i.memory.geometries, chars: kit ? [...vis.values()].filter((v) => v.a).length : P.body.count, ghosts: [...ghostVis.values()].filter((v) => v.a).length, loaded: !!kit, parts: glow.list.length + solid.list.length, rooms: rooms.size }; },
-    dispose() { disposed = true; for (const r of rooms.values()) disposeRoom(r); rooms.clear(); scene.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); for (const x of global) x.dispose?.(); if (env) env.dispose(); if (kit) kit.dispose(); renderer.dispose(); },
+    dispose() { disposed = true; for (const r of rooms.values()) disposeRoom(r); rooms.clear(); scene.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); for (const x of global) x.dispose?.(); if (env) env.dispose(); if (kit) kit.dispose(); if (mons) mons.dispose(); renderer.dispose(); },
     loseContext() { try { renderer.forceContextLoss(); } catch {} },
   };
 }

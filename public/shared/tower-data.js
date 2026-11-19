@@ -10,7 +10,7 @@ export const THEMES = [
   { id: 'clock', name: 'The Clockwork Room', trap: 'pendulum', monster: 'spider', mname: 'the Clockwork Spider', fog: 0x2a2014, floor: 0x7a5a2a, wall: 0x6a5030, light: 0xffc46b },
   { id: 'attic', name: 'The Spider Attic', trap: 'web', monster: 'spider', mname: 'the Giant Spider', fog: 0x221a14, floor: 0x5a4632, wall: 0x4a3a2c, light: 0xffa65a },
   { id: 'lab', name: "The Alchemist's Lab", trap: 'gas', monster: 'mimic', mname: 'the Greedy Mimic', fog: 0x10261c, floor: 0x3e5a4a, wall: 0x35503f, light: 0x8bff9a },
-  { id: 'ballroom', name: 'The Ghostly Ballroom', trap: 'chandelier', monster: 'ghost', mname: 'the Dancing Banshee', fog: 0x2a1430, floor: 0x7a3a5a, wall: 0x5a2a4a, light: 0xff9ad5 },
+  { id: 'ballroom', name: 'The Ghostly Ballroom', trap: 'chandelier', monster: 'ghost', mname: 'the Dancing Banshee', fog: 0x1e0e18, floor: 0x4a2c36, wall: 0x46283a, light: 0xd8a0b4 },
 ];
 export const BOSS_THEME = { id: 'belfry', name: 'The Bell Tower', trap: 'hands', monster: 'boss', fog: 0x140c26, floor: 0x4a4060, wall: 0x3a3050, light: 0xb08cff };
 export const GATE_THEME = { id: 'gate', name: 'The Tower Gate', trap: 'hands', monster: 'ghost', fog: 0x1a1030, floor: 0x5a4a70, wall: 0x45385a, light: 0xffb36b };

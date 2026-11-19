@@ -190,6 +190,8 @@ let sayBusyUntil = 0, sayPending = 0;
 function startLocal() {
   const o = {};
   for (const k of ['gatherSeconds', 'enterSeconds', 'voteSeconds', 'revealSeconds', 'treasureSeconds', 'trapSeconds', 'monsterSeconds', 'riddleSeconds', 'bossSeconds', 'victorySeconds', 'climbSeconds', 'endSeconds', 'minParty', 'startFloor', 'bossEvery', 'fuelDrain', 'monsterHpMul', 'dmgMul', 'topFloor']) if (qs.has(k)) o[k] = Number(qs.get(k));
+  if (qs.get('forceKind')) o.forceKind = String(qs.get('forceKind')).slice(0, 12);
+  if (qs.get('forceTheme')) o.forceTheme = String(qs.get('forceTheme')).slice(0, 12);
   if (qs.get('bots') === '0') o.bots = false;
   let seed = Number(qs.get('seed') || 7);
   const rng = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };

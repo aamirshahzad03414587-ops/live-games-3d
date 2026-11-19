@@ -15,7 +15,7 @@ export const PH = ['gather', 'enter', 'vote', 'reveal', 'treasure', 'trap', 'mon
 export const OUT = ['', 'treasure', 'trap', 'monster', 'riddle'];
 
 export const TOWER_DEFAULTS = {
-  gatherSeconds: 16, enterSeconds: 4.5, voteSeconds: 12, revealSeconds: 2.6, treasureSeconds: 4.5, trapSeconds: 4.5,
+  gatherSeconds: 9, enterSeconds: 2.5, voteSeconds: 12, revealSeconds: 2.6, treasureSeconds: 4.5, trapSeconds: 4.5,
   monsterSeconds: 14, riddleSeconds: 22, bossSeconds: 32, victorySeconds: 4.5, climbSeconds: 4.2, endSeconds: 13,
   minParty: 6, bots: true, fuelDrain: 0.3, likeFuel: 0.12, likeRain: 300, bossEvery: 5, startFloor: 1, sendCap: 70, ghostCap: 16,
   botHitRate: 0.55, dmgMul: 1, monsterHpMul: 1, topFloor: 30,
@@ -208,6 +208,7 @@ export class Tower {
     if (n % this.o.bossEvery === 0) return -2;
     if (this.upcoming && this.upcoming.n === n) return this.upcoming.th;
     let i; do { i = this.r(THEMES.length); } while (i === this.themeIdx && THEMES.length > 1);
+    if (this.o.forceTheme) { const f = THEMES.findIndex((t) => t.id === this.o.forceTheme); if (f >= 0) i = f; }   // visual checks only
     this.upcoming = { n, th: i }; return i;
   }
   startVote() {
@@ -219,6 +220,7 @@ export class Tower {
     if (n === 3) kinds.push(this.rng() < 0.55 ? 'riddle' : this.rng() < hard ? 'trap' : this.rng() < 0.5 ? 'monster' : 'riddle');
     while (kinds.length) pool.push(kinds.splice(this.r(kinds.length), 1)[0]);
     this.kinds = pool;
+    if (this.o.forceKind) this.kinds = this.kinds.map(() => this.o.forceKind);   // demo renders / visual checks only
     for (const m of this.people.values()) m.door = -1;
     this.voteCounts = [0, 0, 0];
     this.setPhase('vote', this.o.voteSeconds);
