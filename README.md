@@ -29,6 +29,14 @@ and set `LIVE_SOURCE=tikfinity` or `both`.
 - **Nothing to read on screen**: the voice explains how to play and what each gift does (short tips in quiet moments)
   and calls the action. The screen only shows small name tags, a timer ring with the fighters-left count, and the
   winner's name at the ceremony. Gift powers show as light pillars, rings, meteors and giants.
+- **Action, not text**: every gift drops a gold loot chest from the sky next to the giver; it bursts into coins and the
+  fighter grabs a big 2-handed KayKit weapon (Knight greatsword, Barbarian great-axe, Mage staff + open spellbook, Rogue
+  heavy crossbow) that stays in their hands for the round. A fighter's 2nd takedown makes the victim's weapon fly into
+  their hands too. Hits knock fighters back with a short hit-stop; multi-kills and the last three fall in slow motion
+  with a punch-in kill cam; the final two get a low, circling duel camera and the storm wall turns red-hot. The storm
+  crackles with lightning and the light dims as it closes. Meteors leave scorch marks; summons and revives come down as
+  pillars of light. Takedowns show as small 💀 pips (🔥 from 3) above the name tag. The champion stands on the podium
+  under a spotlight with fireworks and confetti.
 - `attack NAME` / `⚔️ NAME` / `@name` → go after that player · `shield` / `🛡️` · `dash` / `💨`
 - `revenge` → hunt whoever last hit you · `dance` / `💃` · `color pink|gold|blue|…` → change colour
 - **Likes**: +1 HP per like (max +10 a time) and charge a spin attack (4% per like); every 300 likes of the room = 

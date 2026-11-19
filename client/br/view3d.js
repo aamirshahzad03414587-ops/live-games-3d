@@ -366,7 +366,8 @@ export function createView3D(canvas, opts = {}) {
     renderer.toneMappingExposure = 1.0 - closing * 0.12 + stormU.flash.value * 0.05;
     halos.length = 0;
     podium.visible = world.phase === 'ceremony';
-    if (podium.visible) { const k = MathUtils.clamp((now - (world.phaseStart || now)) / 0.8, 0.01, 1); podMeshes.forEach((m) => (m.scale.y = 1 - Math.pow(1 - k, 3))); }
+    if (world.phase !== lastPh) { lastPh = world.phase; phT0 = now; }
+    if (podium.visible) { const k = MathUtils.clamp((now - phT0) / 0.8, 0.01, 1); podMeshes.forEach((m) => (m.scale.y = 1 - Math.pow(1 - k, 3))); }
 
     const fs = selectFighters(world.fighters, now, quality.maxChars);
     updateCamera(world, dt, now);
@@ -609,7 +610,7 @@ export function createView3D(canvas, opts = {}) {
       case 'phase': if (e.ph === 'battle') { ring(0, 0, { r0: 2, r1: R, color: 0xffffff, dur: 0.9, y: 0.2 }); shake(0.2); } break;
     }
   }
-  let confettiUntil = 0, spotAt = 0;
+  let confettiUntil = 0, spotAt = 0, lastPh = '', phT0 = 0;
   function confetti(now) {
     if (now < confettiUntil) emit(solid, 4, (Math.random() - 0.5) * 7, 7 + Math.random() * 2, (Math.random() - 0.5) * 4, { colors: [0xff4d5e, 0xffd23f, 0x3ec7ff, 0x9be564, 0xff6fb5, 0xffffff], speed: 1.2, life: 3.2, size: 0.32, g: 1.6, drag: 1.4, confetti: true, up: 0 });
   }
