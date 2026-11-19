@@ -20,6 +20,10 @@ const FLAG = { alive: 1, shield: 2, speed: 4, giant: 8, rage: 16, dash: 32, danc
 const TAU = Math.PI * 2;
 const HEROES = ['Knight', 'Barbarian', 'Mage', 'Rogue', 'Rogue_Hooded'];
 const BOTS = ['Skeleton_Minion', 'Skeleton_Warrior', 'Skeleton_Rogue', 'Skeleton_Mage'];
+// loot: a fighter who picks up a weapon (gift chest or a fallen rival's drop) swaps to the same hero carrying a big
+// 2-handed KayKit weapon (the weapons ship inside the CC0 character files; the alternate outfit is merged at load)
+const LOOT = { Knight: ['2H_Sword', 'Knight_Helmet', 'Knight_Cape'], Barbarian: ['2H_Axe', 'Barbarian_Hat', 'Barbarian_Cape'], Mage: ['2H_Staff', 'Spellbook_open', 'Mage_Hat', 'Mage_Cape'], Rogue: ['2H_Crossbow', 'Knife_Offhand', 'Rogue_Cape'], Rogue_Hooded: ['2H_Crossbow', 'Knife_Offhand', 'Rogue_Cape'] };
+const LOOT_ATK = { Knight: ['spin', 'slash', 'attack'], Barbarian: ['spin', 'attack', 'slash'], Mage: ['cast', 'summon'], Rogue: ['shoot'], Rogue_Hooded: ['shoot', 'slash'] };
 const SCALE = 0.72;          // KayKit characters are ~2 m; fighters are ~1.45 m next to the 20 m arena
 const HEAD = 2.1 * SCALE;    // name-tag anchor above the feet
 const ATTACKS = { Knight: ['attack', 'slash'], Barbarian: ['attack', 'slash', 'attack'], Mage: ['cast'], Rogue: ['shoot', 'slash'], Rogue_Hooded: ['slash', 'attack'], Skeleton_Minion: ['attack'], Skeleton_Warrior: ['attack', 'slash'], Skeleton_Rogue: ['slash'], Skeleton_Mage: ['cast'] };
@@ -55,11 +59,15 @@ export function createView3D(canvas, opts = {}) {
   // ------------------------------------------------------------------ arena + characters (async: the GLBs stream in, ~2 MB total)
   const R = opts.platform || 20;
   let arena = null, env = null, kit = null, loadErr = null;
-  const ready = Promise.all([loadEnv(opts.envUrl || '/models/env-br.glb'), loadKit({ names: HEROES.concat(BOTS) })])
+  const ready = Promise.all([loadEnv(opts.envUrl || '/models/env-br.glb'), loadKit({ names: HEROES.concat(BOTS), loot: LOOT })])
     .then(([e, k]) => {
       if (disposed) { e.dispose(); k.dispose(); return; }
       env = e; kit = k;
       arena = buildArena(env, { R, sky: { sunDir: [-0.45, 0.3, 0.84] } }); scene.add(arena.group);
+      // dynamic CC0 props: falling loot chests, weapon drops, meteor rocks
+      if (env.has('chest_gold')) { chestMesh = new InstancedMesh(env.geos.get('chest_gold'), env.matOf('chest_gold'), CH); chestMesh.frustumCulled = false; chestMesh.count = 0; scene.add(chestMesh); }
+      if (env.has('sword_shield')) { dropMesh = new InstancedMesh(env.geos.get('sword_shield'), env.matOf('sword_shield'), CH); dropMesh.frustumCulled = false; dropMesh.count = 0; scene.add(dropMesh); }
+      if (env.has('rock_single_C')) metMesh.geometry = env.geos.get('rock_single_C');
     })
     .catch((err) => { loadErr = err; throw err; });
   ready.catch(() => {});
@@ -67,21 +75,23 @@ export function createView3D(canvas, opts = {}) {
 
   // storm: glowing wall + tinted floor outside the safe zone + dashed next-zone ring
   const wallGeo = keep(new CylinderGeometry(1, 1, 1, 72, 1, true)); wallGeo.translate(0, 0.5, 0);
-  const stormU = { time: { value: 0 }, r: { value: 18 }, rt: { value: 18 }, showT: { value: 0 } };
+  const stormU = { time: { value: 0 }, r: { value: 18 }, rt: { value: 18 }, showT: { value: 0 }, heat: { value: 0 }, flash: { value: 0 } };
   const wall = new Mesh(wallGeo, keep(new ShaderMaterial({
     transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide, uniforms: stormU,
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: `varying vec2 vUv; uniform float time;
+    fragmentShader: `varying vec2 vUv; uniform float time, heat, flash;
       void main(){ float s = sin(vUv.x*150.0 + vUv.y*9.0 - time*2.5)*0.5+0.5; float s2 = sin(vUv.x*61.0 - vUv.y*5.0 + time*1.7)*0.5+0.5;
         float a = pow(1.0 - vUv.y, 1.6) * (0.35 + 0.45*s*s2) + exp(-vUv.y*18.0)*0.8;
         vec3 c = mix(vec3(0.55,0.15,0.95), vec3(1.0,0.45,0.95), s*s2);
-        gl_FragColor = vec4(c * a, 1.0); }`,
+        c = mix(c, mix(vec3(1.0,0.25,0.08), vec3(1.0,0.75,0.2), s*s2), heat);
+        a *= 1.0 + heat * 0.5 + flash * 1.6;
+        gl_FragColor = vec4(c * a + vec3(0.6,0.7,1.0) * flash * 0.25 * (1.0 - vUv.y), 1.0); }`,
   })));
   wall.renderOrder = 3; scene.add(wall);
   const stormDisc = new Mesh(keep(new CircleGeometry(R + 0.4, 72)), keep(new ShaderMaterial({
     transparent: true, depthWrite: false, uniforms: stormU,
     vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
-    fragmentShader: `varying vec3 vW; uniform float r, rt, time, showT;
+    fragmentShader: `varying vec3 vW; uniform float r, rt, time, showT, heat;
       void main(){ float d = length(vW.xz);
         float outside = smoothstep(r - 0.1, r + 0.5, d);
         float edge = exp(-abs(d - r) * 2.5);
@@ -89,6 +99,7 @@ export function createView3D(canvas, opts = {}) {
         float dash = step(0.45, fract(ang * 16.0 / 6.2832 + time * 0.25));
         float tgt = (1.0 - smoothstep(0.03, 0.12, abs(d - rt))) * dash * showT;
         vec3 c = mix(vec3(0.32,0.08,0.5), vec3(1.0,0.6,1.0), edge);
+        c = mix(c, mix(vec3(0.4,0.06,0.02), vec3(1.0,0.55,0.2), edge), heat);
         c = mix(c, vec3(1.0), tgt);
         float a = clamp(outside * 0.6 + edge * 0.55 + tgt * 0.9, 0.0, 0.92);
         gl_FragColor = vec4(c, a); }`,
@@ -140,6 +151,36 @@ export function createView3D(canvas, opts = {}) {
   const MET = 12;
   const metMesh = new InstancedMesh(keep(new IcosahedronGeometry(0.55, 0)), keep(new MeshLambertMaterial({ color: 0xff8a3d, emissive: 0xff5a10 })), MET); metMesh.frustumCulled = false; metMesh.count = 0; scene.add(metMesh);
   const meteors = []; // { x, z, t0, d }
+  // scorch marks where meteors land (dark soft decals, fade out)
+  const SC = 12;
+  const scorch = inst(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), keep(new MeshBasicMaterial({ map: softTex, color: 0x1a0c06, transparent: true, depthWrite: false })), SC); scorch.renderOrder = 2;
+  const scorches = []; // { x, z, t0, r }
+  // light beams: gift summons, revives, loot markers, the champion's spotlight (instanced open cylinders, additive)
+  const BM = 10;
+  const beamMesh = new InstancedMesh(keep(new CylinderGeometry(1, 1, 1, 20, 1, true).translate(0, 0.5, 0)), keep(new ShaderMaterial({
+    transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide,
+    vertexShader: `varying vec2 vUv; varying vec3 vC; void main(){ vUv = uv;
+      #ifdef USE_INSTANCING_COLOR
+        vC = instanceColor;
+      #else
+        vC = vec3(1.0);
+      #endif
+      gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position,1.0); }`,
+    fragmentShader: 'varying vec2 vUv; varying vec3 vC; void main(){ float a = pow(1.0 - vUv.y, 1.4) * (0.55 + 0.45 * sin(vUv.x * 62.83 + vUv.y * 9.0)); gl_FragColor = vec4(vC * a, 1.0); }',
+  })), BM);
+  beamMesh.frustumCulled = false; beamMesh.renderOrder = 7; beamMesh.count = 0; { const c = new Color(0, 0, 0); for (let i = 0; i < BM; i++) beamMesh.setColorAt(i, c); } scene.add(beamMesh);
+  const beams = []; // { x, z, t0, dur, r, h, col, follow }
+  function beam(x, z, o = {}) { beams.push({ x, z, t0: time, dur: o.dur || 1.2, r: o.r || 0.9, h: o.h || 22, col: new Color(o.color ?? 0xffffff), follow: o.follow || 0, y: o.y || 0 }); if (beams.length > BM) beams.shift(); }
+  // loot: chests fall from the sky next to a gifter and burst open; a fallen rival's weapon flies to the killer
+  const CH = 6;
+  let chestMesh = null, dropMesh = null;
+  const chests = [], drops = []; // chests { id, x, z, t0, done }  drops { id, x, z, t0 }
+  const looted = new Set();
+  function giveLoot(id) {
+    if (looted.has(id)) return; looted.add(id);
+    const s = vis.get(id); if (!s) return;
+    s.loot = true; if (s.a) { const st = s.a.state; detach(s); s.relootAt = time; s.prevState = st; }
+  }
 
   // ------------------------------------------------------------------ particles: glow (additive) + solid (confetti, smoke)
   function particleSystem(cap, additive) {
@@ -201,15 +242,16 @@ export function createView3D(canvas, opts = {}) {
   const tmpC2 = new Color();
   const hash = (n) => { n = (n ^ 61) ^ (n >>> 16); n = (n + (n << 3)) | 0; n ^= n >>> 4; n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
   const modelOf = (f) => (f.flags & FLAG.bot ? BOTS[hash(f.id) % BOTS.length] : HEROES[hash(f.id) % HEROES.length]);
+  const meshOf = (s) => (s.loot && kit && kit.templates.has(s.model + '@loot') ? s.model + '@loot' : s.model);
   function vstate(f, now) {
     let s = vis.get(f.id);
-    if (!s) { s = { a: null, model: modelOf(f), x: f.x, y: f.y, z: f.z, face: f.face, gs: 1, seen: now, spawn: now, hit: -9, atkN: 0, spinT: -9, frame: 0, acc: 0, speed: 0 }; vis.set(f.id, s); }
+    if (!s) { s = { a: null, model: modelOf(f), loot: looted.has(f.id), kb: null, kbx: 0, kbz: 0, freeze: 0, x: f.x, y: f.y, z: f.z, face: f.face, gs: 1, seen: now, spawn: now, hit: -9, atkN: 0, spinT: -9, frame: 0, acc: 0, speed: 0 }; vis.set(f.id, s); }
     return s;
   }
   function attach(s, f) {
     if (s.a || !kit) return;
     const tint = f.flags & FLAG.bot ? null : (f.info?.color ?? null);
-    s.a = kit.actor(s.model, tint); s.a.obj.scale.setScalar(SCALE); scene.add(s.a.obj);
+    s.a = kit.actor(meshOf(s), tint); s.a.obj.scale.setScalar(SCALE); scene.add(s.a.obj);
   }
   function detach(s) { if (s.a) { kit.release(s.a); s.a = null; } }
   let selected = [], selectAt = 0;
@@ -228,13 +270,14 @@ export function createView3D(canvas, opts = {}) {
   // ------------------------------------------------------------------ cinematic camera
   // lobby: slow crane orbit over the island; battle: follows the busiest fight at a low 3/4 angle with a gentle drift;
   // kill cam: short low push-in on the killer; ceremony: low hero shot circling the podium
-  const cam = { tx: 0, ty: 0, tz: 0, dist: 30, yaw: 0.9, pitch: 0.6, kill: null, shake: 0, orbit: 0 };
+  const cam = { tx: 0, ty: 0, tz: 0, dist: 30, yaw: 0.9, pitch: 0.6, kill: null, shake: 0, orbit: 0, zoom: 0, duel: 0 };
+  const angTo = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
   let aspect = 9 / 16, W = 390, H = 844;
   const action = { x: 0, z: 0, w: 0 }, cluster = { x: 0, z: 0, at: 0 };
   function updateCamera(world, dt, now) {
     let tx = 0, tz = 0, ty = 0.9, dist = 26, pitch = 0.62;
     const ph = world.phase, fs = world.fighters;
-    cam.orbit += dt * (ph === 'lobby' ? 0.07 : ph === 'ceremony' ? 0.14 : 0.025);
+    cam.orbit += dt * (ph === 'lobby' ? 0.07 : ph === 'ceremony' ? 0 : 0.025 * (1 - cam.duel));
     action.w *= Math.exp(-dt * 0.8);
     if (ph === 'battle' && fs.length) {
       if (now > cluster.at) {
@@ -251,20 +294,36 @@ export function createView3D(canvas, opts = {}) {
       const ds = []; for (const f of fs) if (!(f.flags & FLAG.air)) ds.push(Math.hypot(f.x - tx, f.z - tz));
       ds.sort((a, b) => a - b);
       const spread = Math.max(ds.length ? ds[Math.min(ds.length - 1, Math.max(2, Math.floor(ds.length * 0.45)))] : 3, 2.5);
-      dist = MathUtils.clamp(6.5 + spread * (aspect < 0.7 ? 1.25 : 0.9), 9.5, 21);
-      pitch = 0.36 + Math.min(0.1, dist * 0.004);
+      dist = MathUtils.clamp(5.5 + spread * (aspect < 0.7 ? 1.1 : 0.85), 8, 18);
+      pitch = 0.34 + Math.min(0.1, dist * 0.004);
       ty = 1.0;
-    } else if (ph === 'ceremony') { tx = 0; tz = 0.3; ty = 2.2; dist = 8.5; pitch = 0.2; }
+      // the final duel: a low side-on two-shot that circles the last two fighters
+      const duo = fs.length === 2 && world.n === 2 ? fs : null;
+      cam.duel += ((duo ? 1 : 0) - cam.duel) * Math.min(1, dt * 1.5);
+      if (duo) {
+        const [A, B] = duo, mx = (A.x + B.x) / 2, mz = (A.z + B.z) / 2, sep = Math.hypot(A.x - B.x, A.z - B.z);
+        tx = mx; tz = mz; ty = 1.1; dist = MathUtils.clamp(4.5 + sep * 0.95, 6.5, 14); pitch = 0.2;
+        let want = Math.atan2(A.x - B.x, -(A.z - B.z)) + Math.sin(now * 0.25) * 0.35;   // perpendicular to the line between them
+        const cur = cam.yaw + cam.orbit; if (Math.abs(angTo(cur, want + Math.PI)) < Math.abs(angTo(cur, want))) want += Math.PI;
+        cam.orbit += angTo(cur, want) * Math.min(1, dt * 1.2);
+      }
+    } else if (ph === 'ceremony') {
+      // hero shot from the front of the podium, slightly below the champion, gentle sway
+      tx = 0; tz = 0.3; ty = 2.4; dist = 7.6; pitch = 0.14;
+      const want = Math.PI / 2 + Math.sin(now * 0.35) * 0.32, cur = cam.yaw + cam.orbit; cam.orbit += angTo(cur, want) * Math.min(1, dt * 2.5);
+    }
     else { const ds = fs.map((f) => Math.hypot(f.x, f.z)).sort((a, b) => a - b); const sp = ds.length ? ds[Math.floor(ds.length * 0.75)] : 4; dist = MathUtils.clamp(10 + sp * (aspect < 0.7 ? 1.25 : 1.0), 12, 26); pitch = 0.36 + Math.sin(now * 0.11) * 0.05; ty = 1.2; }
     if (cam.kill && now < cam.kill.until) {
       const k = cam.kill, f = fs.find((x) => x.id === k.id) || k.last;
-      if (f) { k.last = f; const w = Math.min(1, (now - k.t0) / 0.3, (k.until - now) / 0.4); tx = MathUtils.lerp(tx, f.x, w); tz = MathUtils.lerp(tz, f.z, w); ty = MathUtils.lerp(ty, 1.0, w); dist = MathUtils.lerp(dist, 6.5, w); pitch = MathUtils.lerp(pitch, 0.28, w); }
+      if (f) { k.last = f; const w = Math.min(1, (now - k.t0) / 0.3, (k.until - now) / 0.4); tx = MathUtils.lerp(tx, f.x, w); tz = MathUtils.lerp(tz, f.z, w); ty = MathUtils.lerp(ty, 1.0, w); const kv = vis.get(k.id); dist = MathUtils.lerp(dist, (k.d || 7) * (kv ? kv.gs : 1), w); pitch = MathUtils.lerp(pitch, k.p ?? 0.28, w); ty = MathUtils.lerp(ty, k.y ?? 1.0, w); }
     }
     const k = 1 - Math.exp(-dt * 2.2), kd = 1 - Math.exp(-dt * 1.4);
     cam.tx += (tx - cam.tx) * k; cam.ty += (ty - cam.ty) * k; cam.tz += (tz - cam.tz) * k; cam.dist += (dist - cam.dist) * kd; cam.pitch += (pitch - cam.pitch) * kd;
+    cam.zoom = Math.max(0, cam.zoom - dt * 1.6);
     focus.set(cam.tx, 0, cam.tz);
     const yaw = cam.yaw + cam.orbit;
-    const cx = cam.tx + Math.cos(yaw) * Math.cos(cam.pitch) * cam.dist, cy = cam.ty + Math.sin(cam.pitch) * cam.dist, cz = cam.tz + Math.sin(yaw) * Math.cos(cam.pitch) * cam.dist;
+    const cd = cam.dist * (1 - Math.min(0.2, cam.zoom * 0.2));   // punch-in on big moments
+    const cx = cam.tx + Math.cos(yaw) * Math.cos(cam.pitch) * cd, cy = cam.ty + Math.sin(cam.pitch) * cd, cz = cam.tz + Math.sin(yaw) * Math.cos(cam.pitch) * cd;
     cam.shake = Math.max(0, cam.shake - dt * 1.8);
     const sh = cam.shake * cam.shake * 0.7;
     camera.position.set(cx + (Math.sin(now * 47) + Math.sin(now * 29)) * sh, Math.max(0.6, cy + Math.sin(now * 53) * sh), cz + Math.cos(now * 41) * sh);
@@ -274,7 +333,22 @@ export function createView3D(canvas, opts = {}) {
   // ------------------------------------------------------------------ frame
   let quality = { maxChars: CAP, halos: true, particles: 1, animLod: 1 };
   const halos = [];
-  let time = 0, frameNo = 0;
+  let time = 0, frameNo = 0, boltAt = 0, fireworkAt = 0;
+  function bolt(sr) {
+    const a = Math.random() * TAU, x = Math.cos(a) * sr, z = Math.sin(a) * sr;
+    let px = x, pz = z;
+    for (let i = 0; i < 12; i++) { const y = 9 - i * 0.78; px += (Math.random() - 0.5) * 0.7; pz += (Math.random() - 0.5) * 0.7; emit(glow, 1, px, y, pz, { color: i % 3 ? 0xd8c8ff : 0xffffff, speed: 0, life: 0.22, size: 1.1, size1: 0.6, g: 0 }); }
+    emit(glow, 10, x, 0.3, z, { colors: [0xffffff, 0xc9a8ff], speed: 4, life: 0.35, size: 0.4, g: 3, up: 0.6 });
+    stormU.flash.value = 1;
+    if (Math.hypot(x - cam.tx, z - cam.tz) < 10) shake(0.12);
+  }
+  function fireworks(now) {
+    if (now < fireworkAt) return; fireworkAt = now + 0.35 + Math.random() * 0.35;
+    const x = (Math.random() - 0.5) * 16, y = 8 + Math.random() * 5, z = -4 - Math.random() * 6;
+    const cols = [[0xff4d5e, 0xffd23f], [0x3ec7ff, 0xffffff], [0x9be564, 0xfff1a8], [0xff6fb5, 0xd08cff]][(Math.random() * 4) | 0];
+    emit(glow, 46, x, y, z, { colors: cols, speed: 7, life: 1.3, size: 0.45, size1: 0.15, g: 2.2, drag: 1.6, up: -0.5, spreadUp: 1.4 });
+    emit(glow, 1, x, y, z, { color: cols[0], speed: 0, life: 0.35, size: 6, size1: 2, g: 0, alpha: 0.7 });
+  }
   function frame(world, dt, now) {
     time = now; frameNo++;
     stormU.time.value = now; bubble.material.uniforms.time.value = now;
@@ -282,7 +356,14 @@ export function createView3D(canvas, opts = {}) {
     const sr = world.phase === 'battle' ? world.r : R + 2;
     stormU.r.value = sr; stormU.rt.value = world.rt; stormU.showT.value = world.phase === 'battle' && world.rt < world.r - 0.3 ? 1 : 0;
     wall.visible = world.phase === 'battle' && sr < R + 0.5;
-    wall.scale.set(sr, 7 + Math.sin(now * 2) * 0.3, sr);
+    wall.scale.set(sr, 9 + Math.sin(now * 2) * 0.4, sr);
+    // the storm closes in: the light dims and cools, the wall runs hot for the last three; lightning on the wall
+    const closing = world.phase === 'battle' ? MathUtils.clamp(1 - sr / R, 0, 1) : 0;
+    const heatT = world.phase === 'battle' && world.n <= 3 ? 1 : 0; stormU.heat.value += (heatT - stormU.heat.value) * Math.min(1, dt * 2);
+    stormU.flash.value = Math.max(0, stormU.flash.value - dt * 4);
+    if (wall.visible && now > boltAt) { boltAt = now + 0.9 + Math.random() * 2.4; bolt(sr); }
+    hemi.intensity = 1.15 - closing * 0.4 + stormU.flash.value * 0.3; sun.intensity = 2.0 - closing * 0.7;
+    renderer.toneMappingExposure = 1.0 - closing * 0.12 + stormU.flash.value * 0.05;
     halos.length = 0;
     podium.visible = world.phase === 'ceremony';
     if (podium.visible) { const k = MathUtils.clamp((now - (world.phaseStart || now)) / 0.8, 0.01, 1); podMeshes.forEach((m) => (m.scale.y = 1 - Math.pow(1 - k, 3))); }
@@ -307,7 +388,9 @@ export function createView3D(canvas, opts = {}) {
       if (a) {
         let yaw = Math.PI / 2 - s.face;
         if (now - s.spinT < 0.45) yaw += (now - s.spinT) * 30;
-        a.obj.position.set(s.x, s.y, s.z); a.obj.rotation.set(0, yaw, 0); a.obj.scale.setScalar(SCALE * s.gs * (0.4 + 0.6 * spawnK));
+        // knockback: a short shove away from the hit, eased back
+        let kx = 0, kz = 0; if (s.kb) { const kt = (now - s.kb.t0) / 0.28; if (kt >= 1) s.kb = null; else { const e = (1 - kt) * (1 - kt) * s.kb.m; kx = s.kb.x * e; kz = s.kb.z * e; } }
+        a.obj.position.set(s.x + kx, s.y, s.z + kz); a.obj.rotation.set(0, yaw, 0); a.obj.scale.setScalar(SCALE * s.gs * (0.4 + 0.6 * spawnK));
         // base loop from the fighter's state; one-shots (attack, hit, block…) come from events
         const base = world.phase === 'ceremony' && f.flags & FLAG.crown ? 'cheer' : dance ? 'cheer' : air ? 'jump' : s.speed > 2.2 ? 'run' : s.speed > 0.5 ? 'walk' : world.phase === 'battle' ? 'combat' : 'idle';
         if (base === 'jump') { if (a.state !== 'jump' && now >= a.until) a.play('jump', now); } else a.play(base, now);
@@ -316,7 +399,9 @@ export function createView3D(canvas, opts = {}) {
         s.acc += dt;
         const far = Math.hypot(s.x - cam.tx, s.z - cam.tz) > 12 || n > 30;
         const every = far ? 2 * lod : lod;
-        if ((frameNo + f.id) % every === 0) { tickActor(kit, a, s.acc, now); s.acc = 0; }
+        if (s.relootAt && now - s.relootAt < 1) { a.play('cheer', now); a.until = now + 0.9; s.relootAt = 0; }
+        if (now < s.freeze) { /* hit-stop: hold the pose for a few frames */ }
+        else if ((frameNo + f.id) % every === 0) { tickActor(kit, a, s.acc, now); s.acc = 0; }
       }
       // blob shadow + viewer colour ring
       const shs = (1.1 + (giant ? 1.1 : 0)) * (air ? Math.max(0.3, 1 - s.y / 14) : 1) * spawnK;
@@ -332,6 +417,7 @@ export function createView3D(canvas, opts = {}) {
       if (air) emit(glow, 1, s.x, s.y + 0.9, s.z, { color: 0xbfe9ff, speed: 0.2, life: 0.5, size: 0.4, g: -2, up: 1 });
       if ((f.flags & FLAG.cmd) && quality.halos) { tmpC2.set(info.color ?? 0xffffff); halos.push([s.x, 0.15, s.z, tmpC2.r * 0.6, tmpC2.g * 0.6, tmpC2.b * 0.6, 0.6, 2.4 * s.gs]); }
       if (giant && quality.halos) halos.push([s.x, s.y + 1.4, s.z, 1, 0.75, 0.3, 0.3, 7]);
+      if (s.loot && quality.halos && a && a.hand && n < 24) halos.push([s.x, s.y + 1.0 * s.gs, s.z, 1, 0.8, 0.35, 0.28 + 0.1 * Math.sin(now * 5 + f.id), 1.6 * s.gs]);
       n++;
     }
     // foot rings: one per viewer fighter (bots have none), coloured by the viewer's colour
@@ -377,6 +463,52 @@ export function createView3D(canvas, opts = {}) {
       if (quality.halos) halos.push([x, y, z, 1, 0.55, 0.2, 0.9, 5]);
     }
     metMesh.count = mn; metMesh.instanceMatrix.needsUpdate = true;
+    // scorch decals
+    for (let i = scorches.length - 1; i >= 0; i--) if (now - scorches[i].t0 > 7) scorches.splice(i, 1);
+    scorches.forEach((c, i) => { const k = Math.min(1, (now - c.t0) * 8) * Math.min(1, (7 - (now - c.t0)) / 2); M.compose(V.set(c.x, 0.035, c.z), Q.identity(), S.set(c.r * k, 1, c.r * k)); scorch.setMatrixAt(i, M); });
+    scorch.count = scorches.length; scorch.instanceMatrix.needsUpdate = true;
+    // beams
+    let bn = 0;
+    for (let i = beams.length - 1; i >= 0; i--) if (now - beams[i].t0 > beams[i].dur) beams.splice(i, 1);
+    for (const b of beams) {
+      if (b.follow) { const fv = vis.get(b.follow); if (fv) { b.x = fv.x; b.z = fv.z; } }
+      const k = (now - b.t0) / b.dur, a = Math.min(1, k * 6) * Math.min(1, (1 - k) * 3), r = b.r * (0.6 + 0.4 * Math.min(1, k * 5));
+      M.compose(V.set(b.x, b.y, b.z), Q.identity(), S.set(r, b.h, r)); beamMesh.setMatrixAt(bn, M); beamMesh.setColorAt(bn, tmpC.copy(b.col).multiplyScalar(a * 0.45)); bn++;
+    }
+    beamMesh.count = bn; beamMesh.instanceMatrix.needsUpdate = true; if (beamMesh.instanceColor) beamMesh.instanceColor.needsUpdate = true;
+    // loot chests: fall with a beam, bounce, burst into coins, the gifter grabs the weapon
+    let cn = 0;
+    for (let i = chests.length - 1; i >= 0; i--) if (now - chests[i].t0 > 1.9) chests.splice(i, 1);
+    for (const c of chests) {
+      const t = now - c.t0; let y, sc = 1.6, ry = c.t0 * 3;
+      if (t < 0.7) { const k = t / 0.7; y = 16 * (1 - k * k); ry += t * 6; }
+      else { const b = t - 0.7; y = Math.max(0, Math.sin(Math.min(Math.PI, b * 9)) * 0.5 * Math.exp(-b * 4)); }
+      if (t >= 0.7 && !c.landed) { c.landed = true; ring(c.x, c.z, { r0: 0.4, r1: 2.6, color: 0xffd36a, dur: 0.4 }); emit(solid, 8, c.x, 0.2, c.z, { color: 0xc9b89a, speed: 2.5, life: 0.5, size: 0.5, size1: 0.9, g: 1, up: 0.1, alpha: 0.7 }); shake(0.12); }
+      if (t >= 1.15 && !c.done) {
+        c.done = true;
+        emit(glow, 30, c.x, 0.8, c.z, { colors: [0xffe066, 0xffd36a, 0xffffff, 0xffb347], speed: 6, life: 0.8, size: 0.35, g: 7, up: 0.9 });
+        emit(glow, 1, c.x, 0.9, c.z, { color: 0xffd36a, speed: 0, life: 0.4, size: 5, size1: 2, g: 0, alpha: 0.8 });
+        giveLoot(c.id); const p = vis.get(c.id); if (p) beam(p.x, p.z, { color: 0xffd36a, r: 0.7, h: 6, dur: 0.8, follow: c.id });
+      }
+      if (t > 1.15) sc = 1.6 * Math.max(0, 1 - (t - 1.15) / 0.5);
+      if (chestMesh && cn < CH && sc > 0.01) { M.compose(V.set(c.x, y, c.z), Q.setFromEuler(E.set(0, ry, 0)), S.setScalar(sc)); chestMesh.setMatrixAt(cn++, M); }
+      if (t < 0.7 && quality.halos) halos.push([c.x, y + 0.6, c.z, 1, 0.8, 0.3, 0.7, 2.6]);
+    }
+    if (chestMesh) { chestMesh.count = cn; chestMesh.instanceMatrix.needsUpdate = true; }
+    // weapon drops: pop out of the fallen, hover, fly to the killer
+    let dn = 0;
+    for (let i = drops.length - 1; i >= 0; i--) if (now - drops[i].t0 > 1.3) drops.splice(i, 1);
+    for (const d of drops) {
+      const t = now - d.t0, ks = vis.get(d.id);
+      let x = d.x, z = d.z, y = 0.6 + Math.min(1, t * 3) * 1.2;
+      if (t > 0.7 && ks) { const k = Math.min(1, (t - 0.7) / 0.45), e = k * k; x += (ks.x - d.x) * e; z += (ks.z - d.z) * e; y = MathUtils.lerp(y, 1.2, e); }
+      if (t > 1.15 && !d.done) { d.done = true; giveLoot(d.id); if (ks) emit(glow, 18, ks.x, 1.0, ks.z, { colors: [0xffffff, 0xffe066], speed: 4, life: 0.5, size: 0.35, g: 3 }); }
+      if (dropMesh && dn < CH && !d.done) { M.compose(V.set(x, y, z), Q.setFromEuler(E.set(0.3, now * 7, 0)), S.setScalar(1.8)); dropMesh.setMatrixAt(dn++, M); }
+      if (!d.done && quality.halos) halos.push([x, y, z, 1, 0.9, 0.5, 0.75, 1.8]);
+    }
+    if (dropMesh) { dropMesh.count = dn; dropMesh.instanceMatrix.needsUpdate = true; }
+    if (world.phase === 'lobby' && looted.size) { looted.clear(); for (const v of vis.values()) if (v.loot) { v.loot = false; detach(v); } }
+    if (world.phase === 'ceremony') { fireworks(now); if (now > (spotAt || 0)) { spotAt = now + 2.2; beam(0, 0, { color: 0xffe9a8, r: 1.3, h: 26, dur: 2.4, y: 1.5 }); } }
 
     updateParticles(glow, dt, halos);
     updateParticles(solid, dt, null);
@@ -391,11 +523,16 @@ export function createView3D(canvas, opts = {}) {
   function fx(e, world) {
     const now = time;
     switch (e.k) {
-      case 'atk': { const s = vis.get(e.a); if (s && s.a) { const list = ATTACKS[s.model] || ['attack']; s.a.play(list[s.atkN++ % list.length], now); } break; }
+      case 'atk': { const s = vis.get(e.a); if (s && s.a) { const list = (s.loot && LOOT_ATK[s.model]) || ATTACKS[s.model] || ['attack']; s.a.play(list[s.atkN++ % list.length], now); } break; }
       case 'hit': {
         const s = vis.get(e.b); const p = posOf(e.b, world);
         if (s) { s.hit = now; if (s.a && (now >= s.a.until || e.c || e.m)) s.a.play('hit', now); }
         if (!p) break;
+        // knockback away from the attacker + a tiny hit-stop on both (crits and loot weapons hit harder)
+        const sa = vis.get(e.a), heavy = e.c || e.m || (sa && sa.loot);
+        if (s && !e.s) { const ax = sa ? sa.x : p.x - Math.cos(s.face), az = sa ? sa.z : p.z - Math.sin(s.face); const dx = p.x - ax, dz = p.z - az, d = Math.hypot(dx, dz) || 1; s.kb = { x: dx / d, z: dz / d, m: heavy ? 0.75 : 0.35, t0: now }; s.freeze = now + (heavy ? 0.09 : 0.05); }
+        if (sa && !e.s) sa.freeze = now + (heavy ? 0.08 : 0.04);
+        if (heavy && !e.s) emit(glow, 1, p.x, (p.y || 0) + 0.9, p.z, { color: 0xffffff, speed: 0, life: 0.12, size: 2.4, size1: 1, g: 0 });
         action.x += (p.x - action.x) * 0.15; action.z += (p.z - action.z) * 0.15; action.w = Math.min(8, action.w + 0.4);
         const big = e.c || e.m;
         emit(glow, big ? 14 : 6, p.x, (p.y || 0) + 0.8, p.z, { colors: e.s ? [0xb45cff, 0xe0a0ff] : big ? [0xffffff, 0xffe066, 0xff9a3c] : [0xffffff, 0xfff1a8], speed: big ? 7 : 4.5, life: 0.35, size: big ? 0.5 : 0.35, g: 6, up: 0.3 });
@@ -415,7 +552,11 @@ export function createView3D(canvas, opts = {}) {
         emit(glow, 1, p.x, 1.2, p.z, { color: 0xeafcff, speed: 0.1, life: 1.6, size: 2.2, size1: 1, g: -2.2, drag: 0.5, up: 1, alpha: 0.9 });
         ring(p.x, p.z, { r0: 0.3, r1: 3, color: 0xffd6ff, dur: 0.45 });
         shake(e.multi || e.streak ? 0.35 : 0.16);
-        if (e.a && (e.first || e.multi || e.streak || e.giant || (e.left > 0 && e.left <= 3)) && (!cam.kill || now > cam.kill.until + 3)) { cam.kill = { id: e.a, t0: now, until: now + 1.9 }; act(e.a, 'cheer'); }
+        const final = e.left > 0 && e.left <= 1;
+        if (e.a && (final || e.first || e.multi || e.streak || e.giant || (e.left > 0 && e.left <= 3)) && (final || !cam.kill || now > cam.kill.until + 3)) { cam.kill = { id: e.a, t0: now, until: now + (final ? 2.6 : 1.9), d: final ? 6.5 : 7.5, p: final ? 0.2 : 0.28 }; act(e.a, 'cheer'); cam.zoom = final ? 1 : 0.6; }
+        // the fallen drop their weapon: the killer picks it up on their 2nd takedown (or any multi / streak)
+        const sk = e.a ? vis.get(e.a) : null;
+        if (sk && !looted.has(e.a) && !(e.s || e.m) && ((e.n || 0) >= 2 || e.multi || e.streak) && drops.length < CH) drops.push({ id: e.a, x: p.x, z: p.z, t0: now });
         vis.delete(e.b);
         break;
       }
@@ -430,8 +571,11 @@ export function createView3D(canvas, opts = {}) {
         emit(glow, 34, e.x, 0.5, e.z, { colors: [0xffffff, 0xffd36a, 0xff8a3d, 0xff4b1f], speed: 9, life: 0.7, size: 0.8, g: 4, up: 0.5 });
         emit(solid, 14, e.x, 0.6, e.z, { colors: [0x5a4a6e, 0x7d6a8f, 0x3a2f4a], speed: 3.5, life: 1.2, size: 1.2, size1: 2.4, g: -0.6, alpha: 0.8, up: 0.5 });
         ring(e.x, e.z, { r0: 0.5, r1: e.r * 1.6, color: 0xffb060, dur: 0.5 }); ring(e.x, e.z, { r0: 0.2, r1: e.r, color: 0xffffff, dur: 0.25 });
-        shake(0.5); break;
-      case 'nuke': shake(1.1); ring(0, 0, { r0: 1, r1: R, color: 0xff8af0, dur: 1.2, y: 0.3 }); emit(glow, 60, 0, 1, 0, { colors: [0xffffff, 0xff8af0, 0x9b5de5], speed: 22, life: 1, size: 1, g: 0, up: 0.1 }); break;
+        emit(glow, 1, e.x, 1.2, e.z, { color: 0xffb060, speed: 0, life: 0.3, size: 9, size1: 3, g: 0, alpha: 0.9 });
+        emit(solid, 10, e.x, 0.3, e.z, { colors: [0x6b5a44, 0x4a3b2c], speed: 6, life: 0.9, size: 0.3, g: 14, up: 1.2 });
+        scorches.push({ x: e.x, z: e.z, t0: now, r: e.r * 1.4 + 1 }); if (scorches.length > SC) scorches.shift();
+        shake(0.5); cam.zoom = Math.max(cam.zoom, 0.3); break;
+      case 'nuke': shake(1.1); cam.zoom = 0.8; for (let i = 0; i < 6; i++) beam(Math.cos(i) * 8, Math.sin(i) * 8, { color: 0xff8af0, r: 1.4, h: 30, dur: 1.4 }); ring(0, 0, { r0: 1, r1: R, color: 0xff8af0, dur: 1.2, y: 0.3 }); emit(glow, 60, 0, 1, 0, { colors: [0xffffff, 0xff8af0, 0x9b5de5], speed: 22, life: 1, size: 1, g: 0, up: 0.1 }); break;
       case 'power': case 'revive': {
         // gift powers are shown, not written: a coloured pillar of light + ring on the viewer's fighter
         act(e.a, e.k === 'revive' ? 'rise' : 'summon');
@@ -440,7 +584,20 @@ export function createView3D(canvas, opts = {}) {
         ring(p.x, p.z, { r0: 0.3, r1: 3.2, color: col, dur: 0.6 });
         for (let i = 0; i < 7; i++) emit(glow, 4, p.x, 0.2 + i * 0.55, p.z, { color: col, speed: 1.2, life: 0.9, size: 0.6, g: -4, up: 1, jitter: 0.5 });
         if (quality.halos) emit(glow, 1, p.x, 1.4, p.z, { color: col, speed: 0, life: 0.8, size: 5, size1: 2, g: 0, alpha: 0.6 });
+        // a pillar of light from the sky onto the gifter + the camera swings over for a look
+        beam(p.x, p.z, { color: col, r: e.tier === 'giant' ? 1.6 : 1.0, h: 24, dur: e.tier === 'giant' || e.k === 'revive' ? 1.8 : 1.1, follow: e.a });
+        if (e.k === 'revive') for (let i = 0; i < 3; i++) emit(glow, 6, p.x, 0.3, p.z, { colors: [0x6dff9c, 0xffffff], speed: 1.5, life: 1.2, size: 0.4, g: -3, up: 1, jitter: 1.2 });
+        if (e.tier === 'giant') { ring(p.x, p.z, { r0: 0.5, r1: 5, color: 0xffb347, dur: 0.7 }); emit(solid, 12, p.x, 0.2, p.z, { colors: [0x8a7a62, 0x6b5a44], speed: 5, life: 0.8, size: 0.35, g: 12, up: 1 }); shake(0.45); }
+        if (!cam.kill || now > cam.kill.until) cam.kill = { id: e.a, t0: now, until: now + 1.6, d: 7.5, p: 0.3 };
         shake(0.2); break;
+      }
+      case 'gift': {
+        // every gift also drops a loot chest from the sky next to the giver's fighter (one per fighter per round)
+        if (!e.a || world.phase !== 'battle' || looted.has(e.a) || chests.some((c) => c.id === e.a) || chests.length >= CH) break;
+        const p = posOf(e.a, world); if (!p) break;
+        const a = Math.random() * TAU, x = p.x + Math.cos(a) * 1.3, z = p.z + Math.sin(a) * 1.3;
+        chests.push({ id: e.a, x, z, t0: now }); beam(x, z, { color: 0xffd36a, r: 0.55, h: 18, dur: 1.0 });
+        break;
       }
       case 'cmd': {
         if (e.c === 'attack' || e.c === 'revenge') { const p = posOf(e.b, world); if (p) ring(p.x, p.z, { kind: 'mark', r0: 0.9, dur: 1.5, color: 0xff3355 }); }
@@ -448,11 +605,11 @@ export function createView3D(canvas, opts = {}) {
         break;
       }
       case 'hype': for (let i = 0; i < 40; i++) emit(glow, 1, (Math.random() - 0.5) * 30, 9 + Math.random() * 4, (Math.random() - 0.5) * 30, { color: 0xff7ab8, speed: 0.5, life: 2.2, size: 0.6, g: 4, drag: 2.5 }); break;
-      case 'win': confettiUntil = now + 4.5; shake(0.3); break;
+      case 'win': confettiUntil = now + 6; shake(0.3); fireworkAt = now + 0.8; break;
       case 'phase': if (e.ph === 'battle') { ring(0, 0, { r0: 2, r1: R, color: 0xffffff, dur: 0.9, y: 0.2 }); shake(0.2); } break;
     }
   }
-  let confettiUntil = 0;
+  let confettiUntil = 0, spotAt = 0;
   function confetti(now) {
     if (now < confettiUntil) emit(solid, 4, (Math.random() - 0.5) * 7, 7 + Math.random() * 2, (Math.random() - 0.5) * 4, { colors: [0xff4d5e, 0xffd23f, 0x3ec7ff, 0x9be564, 0xff6fb5, 0xffffff], speed: 1.2, life: 3.2, size: 0.32, g: 1.6, drag: 1.4, confetti: true, up: 0 });
   }

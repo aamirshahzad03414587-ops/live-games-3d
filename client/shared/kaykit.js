@@ -44,9 +44,9 @@ function lambertFrom(m, tex) {
 }
 
 /** merge one KayKit character into a template Group { root bone, single SkinnedMesh } */
-function buildTemplate(gltf, name) {
+function buildTemplate(gltf, name, outfit = OUTFITS[name], ownGeo = true) {
   const scene = gltf.scene; scene.updateMatrixWorld(true);
-  const keepAcc = new Set(OUTFITS[name] || []);
+  const keepAcc = new Set(outfit || []);
   const skinned = []; const rigid = [];
   scene.traverse((o) => { if (o.isSkinnedMesh) skinned.push(o); else if (o.isMesh) rigid.push(o); });
   if (!skinned.length) throw new Error('no skinned mesh in ' + name);
@@ -100,7 +100,7 @@ function buildTemplate(gltf, name) {
   const rootBone = (() => { let r = bones[0]; while (r.parent && r.parent.isBone) r = r.parent; return r; })();
   // the rigid accessories were baked into the merged mesh: drop the originals from the bone tree (else every clone draws them again)
   const strays = []; rootBone.traverse((o) => { if (o.isMesh) strays.push(o); });
-  for (const o of strays) { o.parent.remove(o); o.geometry.dispose(); }
+  for (const o of strays) { o.parent.remove(o); if (ownGeo) o.geometry.dispose(); }
   tpl.add(rootBone);
   const mesh = new SkinnedMesh(geo, mats.length > 1 ? mats.map((x) => x.mat) : mats[0].mat);
   mesh.frustumCulled = true;
@@ -110,11 +110,14 @@ function buildTemplate(gltf, name) {
 }
 
 /** load characters + the shared clips. names: KayKit character names. */
-export async function loadKit({ base = '/models', names = [], onProgress } = {}) {
+export async function loadKit({ base = '/models', names = [], loot = null, onProgress } = {}) {
   const kit = { templates: new Map(), clips: new Map(), variants: new Map(), pools: new Map(), disposables: [] };
   const [anims, ...chars] = await Promise.all([loadGLB(`${base}/anims.glb`), ...names.map((n) => loadGLB(`${base}/chars/${n}.glb`))]);
   for (const c of anims.animations) kit.clips.set(c.name, c);
-  names.forEach((n, i) => { const t = buildTemplate(chars[i], n); kit.templates.set(n, t); kit.disposables.push(t.geo, ...t.mats); for (const m of t.mats) if (m.map) kit.disposables.push(m.map); onProgress?.(n); });
+  names.forEach((n, i) => {
+    // alternate outfits (e.g. a looted 2-handed weapon) are merged from a clone first: the main build takes the bones
+    if (loot && loot[n]) { const lt = buildTemplate({ scene: skClone(chars[i].scene) }, n + '@loot', loot[n], false); kit.templates.set(n + '@loot', lt); kit.disposables.push(lt.geo, ...lt.mats); }
+    const t = buildTemplate(chars[i], n); kit.templates.set(n, t); kit.disposables.push(t.geo, ...t.mats); for (const m of t.mats) if (m.map) kit.disposables.push(m.map); onProgress?.(n); });
 
   /** a material variant: the character's texture tinted toward a viewer colour (cached, shared by everyone with that tint) */
   kit.material = (name, tint = null, amount = 0.32) => {

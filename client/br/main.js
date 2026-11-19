@@ -144,9 +144,16 @@ function pushSnap(s) {
   if (snaps.length > 40) snaps.shift();
 }
 const DELAY = 0.16;
+// slow motion: playback runs slower for a moment (final takedown, multi-kills), then catches up with the live feed
+let slowUntil = 0, slowRate = 1, playT = null, lastNow = 0;
+function slowmo(dur, rate) { const n = clockNow(); if (n + dur > slowUntil) { slowUntil = n + dur; slowRate = Math.min(rate, slowUntil > n ? slowRate : 1); } N.slow = (N.slow || 0) + 1; }
+function timeScale(now) { if (now < slowUntil) return slowRate; slowRate = 1; return 1; }
 function netWorld(now) {
   if (!snaps.length) return world;
-  const t = now - offset - DELAY;
+  const live = now - offset - DELAY, step = Math.max(0, Math.min(0.2, now - (lastNow || now))); lastNow = now;
+  if (playT === null || Math.abs(live - playT) > 3) playT = live;
+  else { const ts = timeScale(now); playT += step * (ts < 1 ? ts : playT < live - 0.02 ? 1.35 : 1); if (playT > live) playT = live; }
+  const t = playT;
   // dispatch events of every snapshot whose time has come (stale ones only update the HUD)
   for (const sn of snaps) if (!sn.done && sn.tm <= t) { sn.done = true; const stale = t - sn.tm > 1.2; for (const e of sn.s.ev || []) handleEvent(e, stale); }
   let a = snaps[0], b = null;
@@ -197,6 +204,7 @@ function startLocal() {
 }
 let localAcc = 0;
 function localWorld(dt, now) {
+  dt *= timeScale(now);
   if (localCrowd) for (const ev of localCrowd.tick(dt)) sim.input(ev);
   localAcc += dt;
   while (localAcc >= 0.05) { localAcc -= 0.05; sim.step(0.05); }
@@ -239,7 +247,12 @@ function handleEvent(e, stale) {
       break;
     }
     case 'block': S('block'); break;
-    case 'ko': S('ko'); break;
+    case 'ko': {
+      S('ko');
+      if (e.a) kills.set(e.a, e.n || (kills.get(e.a) || 0) + 1);
+      if (!stale) { if (e.left > 0 && e.left <= 1) slowmo(1.6, 0.25); else if (e.multi || e.streak || (e.left > 0 && e.left <= 3)) slowmo(0.55, 0.4); }
+      break;
+    }
     case 'dash': S('dash'); break;
     case 'shield': S('shield'); break;
     case 'spin': S('spin'); break;
@@ -254,7 +267,7 @@ function handleEvent(e, stale) {
     case 'hype': S('heal'); S('cheer'); break;
     case 'phase':
       if (e.ph === 'battle') S('go');
-      if (e.ph === 'lobby') { $('winner').hidden = true; }
+      if (e.ph === 'lobby') { $('winner').hidden = true; kills.clear(); }
       break;
     case 'win': S('fanfare'); showWinner(e); break;
     case 'join': break;
@@ -291,6 +304,7 @@ function drawHud(now) {
 }
 // small name tags (shortened); in crowds they shrink and fade instead of stacking up
 const tagAlpha = new Map();
+const kills = new Map();   // fighter id -> takedowns this round (shown as small skull pips, a flame from 3)
 function drawTags(now, u) {
   const drawn = view.drawn() || world.fighters;
   const q = QL[level];
@@ -319,6 +333,8 @@ function drawTags(now, u) {
     hg.fillStyle = 'rgba(10,6,24,0.55)'; rr(p.x - tw / 2 - u, y - h / 2, tw + u * 2, h, h / 2); hg.fill();
     hg.fillStyle = '#' + ((info.color ?? 0xffffff) >>> 0).toString(16).padStart(6, '0');
     hg.fillText(name, p.x, y + 1);
+    const kc = kills.get(f.id) || 0;
+    if (kc > 0) { const pips = (kc >= 3 ? '🔥' : '') + '💀'.repeat(Math.min(kc, 3)); const ps = Math.round(fsz * 0.8); hg.font = `800 ${ps}px -apple-system, "Segoe UI", Roboto, sans-serif`; hg.fillText(pips, p.x, y - h * 0.95); hg.font = `800 ${fsz}px -apple-system, "Segoe UI", Roboto, sans-serif`; }
     // a hairline health bar only once hurt (no numbers)
     if (f.hp < 99) { const bw = Math.max(u * 6, tw * 0.7), by = y + h / 2 + u * 0.35; hg.fillStyle = 'rgba(0,0,0,0.5)'; hg.fillRect(p.x - bw / 2, by, bw, u * 0.55); hg.fillStyle = f.hp > 55 ? '#3ee07a' : f.hp > 28 ? '#ffd23f' : '#ff4d5e'; hg.fillRect(p.x - bw / 2, by, (bw * Math.max(0, f.hp)) / 100, u * 0.55); }
   }
@@ -370,7 +386,7 @@ const banned = new Map();
 function tick(dt, now) {
   if (LOCAL) world = localWorld(dt, now); else world = netWorld(now);
   if (LOCAL) pumpLocalSay(now);
-  if (view && !paused) { try { view.frame(world, dt, now); } catch (e) { N.err++; mark('frame-err'); if (N.err > 30) to2D(); } }
+  if (view && !paused) { try { view.frame(world, dt * timeScale(now), now); } catch (e) { N.err++; mark('frame-err'); if (N.err > 30) to2D(); } }
   drawHud(now);
   if (now - domT > 0.25) { domT = now; domHud(); }
 }
