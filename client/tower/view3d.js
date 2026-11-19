@@ -351,7 +351,6 @@ export function createTowerView(canvas, opts = {}) {
     g.userData = { mouth, crown };
     M_.ghost = g; monster.add(g);
   }
-  const EYE_Y = Number(new URLSearchParams(location.search).get('eyeY')) || 2.55, EYE_Z = Number(new URLSearchParams(location.search).get('eyeZ')) || 2.2;
   // once the models stream in: the wraith is a horned skull ghost, the boss a trident demon lord (small crown between
   // the horns), the spider room a winged demon — CC0 Quaternius monsters restyled dark with glowing red eyes
   let wraith = null, bossA = null, demonA = null;
@@ -710,7 +709,7 @@ export function createTowerView(canvas, opts = {}) {
         a.tick(dt, now);
         const gl = 0.75 + 0.25 * Math.sin(now * 6);
         if (boss) halos.push([monVis.x, baseY + 3.0 * scl, monVis.z + 0.9, 1, 0.1, 0.03, gl * 0.75, 2.6]);   // red eye glare
-        else for (const sx of [-0.36, 0.36]) { halos.push([monVis.x + sx * scl, baseY + EYE_Y * scl, monVis.z + EYE_Z * scl, 1, 0.08, 0.02, gl, 0.9]); halos.push([monVis.x + sx * scl, baseY + EYE_Y * scl, monVis.z + (EYE_Z + 0.05) * scl, 1, 0.6, 0.3, gl, 0.28]); }   // burning eye sockets
+        else halos.push([monVis.x, baseY + 2.4 * scl, monVis.z + 1.6 * scl, 1, 0.1, 0.03, gl * 0.35, 3.2]);   // red glare around the burning sockets
       } else if (key === 'ghost') { const u = g.userData; u.crown.visible = boss; monGhostMat.color.setHex(boss ? 0xcab8ff : 0xe8ecff); monGhostMat.emissive.setHex(hitK > 0 ? 0xffffff : boss ? 0x3a1a6a : 0x2a2a60); u.mouth.scale.set(0.5, 0.42 + atk * 0.5 + Math.sin(now * 5) * 0.06, 0.2); }
       if (key === 'spider') g.userData.legs.forEach((L, i) => { L.rotation.x = Math.sin(now * 10 + i * 1.3) * 0.25 * (1 + atk); });
       if (key === 'spider' && demonA) { if (now - monVis.atkT < 0.05) demonA.play('bite', now, { speed: 1.3 }); else if (now - monVis.hitT < 0.03 && now >= demonA.until) demonA.play('hit', now); else if (!demonA.until) demonA.play(atk > 0 ? 'move' : 'combat', now); demonA.tick(dt, now); halos.push([monVis.x, baseY + 2.9 * scl, monVis.z + 0.8, 1, 0.1, 0.03, 0.6, 1.6]); }

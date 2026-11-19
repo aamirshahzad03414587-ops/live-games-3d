@@ -201,12 +201,12 @@ export function createSiegeView(canvas, opts = {}) {
         gl_FragColor = vec4(c * power, 1.0); }`,
   }));
   const rift = new Mesh(keep(new PlaneGeometry(13, 16)), riftMat); rift.position.set(0, RIFT_Y, RIFT_Z - 1); scene.add(rift);
-  const riftRing = new Mesh(keep(new TorusGeometry(1, 0.05, 6, 48)), basic(0xd080ff, { transparent: true, opacity: 0.8, blending: AdditiveBlending, depthWrite: false, fog: false }));
+  const riftRing = new Mesh(keep(new TorusGeometry(1, 0.05, 6, 48)), basic(0xff6a3a, { transparent: true, opacity: 0.8, blending: AdditiveBlending, depthWrite: false, fog: false }));
   riftRing.scale.set(6.2, 7.8, 6); riftRing.position.copy(rift.position); riftRing.position.z += 0.2; scene.add(riftRing);
-  const riftPool = new Mesh(keep(new CircleGeometry(1, 40).rotateX(-Math.PI / 2)), basic(0x9a30ff, { transparent: true, opacity: 0.5, blending: AdditiveBlending, depthWrite: false }));
+  const riftPool = new Mesh(keep(new CircleGeometry(1, 40).rotateX(-Math.PI / 2)), basic(0x9a1a10, { transparent: true, opacity: 0.5, blending: AdditiveBlending, depthWrite: false }));
   riftPool.scale.set(9, 1, 4); riftPool.position.set(0, 0.04, RIFT_Z + 1.5); scene.add(riftPool);
   const SH = 16;
-  const shards = new InstancedMesh(G.oct, toon(0x3a1a50, { emissive: 0x7a20c0 }), SH); shards.frustumCulled = false; scene.add(shards);
+  const shards = new InstancedMesh(G.oct, toon(0x2a0a08, { emissive: 0x8a1a08 }), SH); shards.frustumCulled = false; scene.add(shards);
 
   // ------------------------------------------------------------------ barrier (the Ascension dome over the wall)
   const barrierMat = keep(new ShaderMaterial({
@@ -619,7 +619,7 @@ export function createSiegeView(canvas, opts = {}) {
     for (const l of lanterns) halos.push([l[0], l[1], l[2], 1, 0.7, 0.35, 0.8 + 0.15 * Math.sin(now * 7 + l[2]), 2.4]);
     gateRune.material.opacity = 0.45 + 0.3 * Math.sin(now * 2) + bar * 0.3;
     halos.push([0, RIFT_Y, RIFT_Z, 0.7, 0.25, 1, 0.2 * riftPow, 13]);
-    if (Math.random() < dt * 8 * partMult && rs > 0.1) { const a = Math.random() * TAU; emit(glow, 1, Math.cos(a) * 5.6 * rs, RIFT_Y + Math.sin(a) * 7 * rs, RIFT_Z, { colors: [0xc060ff, 0xff3a6a], up: 0.2, speed: 1.5, g: -0.5, life: 1.4, size: 0.5 }); }
+    if (Math.random() < dt * 8 * partMult && rs > 0.1) { const a = Math.random() * TAU; emit(glow, 1, Math.cos(a) * 5.6 * rs, RIFT_Y + Math.sin(a) * 7 * rs, RIFT_Z, { colors: [0xff7a30, 0xff2a1a], up: 0.2, speed: 1.5, g: -0.5, life: 1.4, size: 0.5 }); }
 
     // ---------------- defenders
     drawn.length = 0;
@@ -838,7 +838,7 @@ export function createSiegeView(canvas, opts = {}) {
         if (Math.random() < dt * 30 * partMult) emit(solid, 1, (Math.random() - 0.5) * 16, 12, -2 + Math.random() * 8, { colors: [0xff4d8a, 0xffd34d, 0x4dc6ff, 0x7dff8a, 0xc77dff], up: 0, speed: 1, g: 2.5, drag: 1.4, life: 4, size: 0.35, confetti: true });
         halos.push([0, 20, -60, 1, 0.75, 0.45, dawn * 0.8, 70]);
       } else {
-        if (Math.random() < dt * 20 * partMult) emit(glow, 1, (Math.random() - 0.5) * 24, Math.random() * 3, -20 + Math.random() * 24, { colors: [0xff2a3a, 0x9a20ff], up: 1, speed: 2, g: -3, life: 1.6, size: 0.8 });
+        if (Math.random() < dt * 20 * partMult) emit(glow, 1, (Math.random() - 0.5) * 24, Math.random() * 3, -20 + Math.random() * 24, { colors: [0xff2a3a, 0xff7a20], up: 1, speed: 2, g: -3, life: 1.6, size: 0.8 });
         if (Math.random() < dt * 2) shake = Math.max(shake, 0.5);
       }
     }
@@ -887,7 +887,7 @@ export function createSiegeView(canvas, opts = {}) {
       case 'bossatk': {
         bossVis.atkT = now;
         const bx = bossVis.x, bz = bossVis.z, top = BOSS[bossVis.id]?.top || 8;
-        if (e.kind === 'summon') { ring(bx, 0.2, bz, 0xb040ff, 7, 0.9); emit(glow, 30, bx, 1, bz, { colors: [0xb040ff, 0xff3a6a], speed: 6, up: 0.4, g: 2, life: 0.8, size: 0.6 }); break; }
+        if (e.kind === 'summon') { ring(bx, 0.2, bz, 0xff3a1a, 7, 0.9); emit(glow, 30, bx, 1, bz, { colors: [0xff5a1a, 0xff2a2a], speed: 6, up: 0.4, g: 2, life: 0.8, size: 0.6 }); break; }
         if (e.kind === 'beam') beam(bx, top * 0.6, bz + 1, e.x, e.blocked ? 3.2 : 1.5, e.blocked ? WALL_FRONT - 1.4 : WALL_FRONT, e.blocked ? 0x7ad8ff : 0xff2a5a, 0.55, 0.7);
         else { ring(bx, 0.15, bz, 0xff3a6a, 16, 0.9); emit(solid, 20, bx, 0.3, bz, { color: 0x4a3a58, speed: 6, up: 0.6, g: 12, life: 0.9, size: 0.5 }); }
         if (e.blocked) barrierHit = now; else flashT = now;
@@ -897,7 +897,7 @@ export function createSiegeView(canvas, opts = {}) {
       }
       case 'bossdown': case 'retreat':
         bossVis.dieT = now; shake = Math.max(shake, 1.4); flashT = now;
-        ring(bossVis.x, 0.2, bossVis.z, 0xffd34d, 16, 1.2); beam(bossVis.x, 0, bossVis.z, bossVis.x, 40, bossVis.z, e.k === 'bossdown' ? 0xffe080 : 0xb040ff, 2.4, 1.2);
+        ring(bossVis.x, 0.2, bossVis.z, 0xffd34d, 16, 1.2); beam(bossVis.x, 0, bossVis.z, bossVis.x, 40, bossVis.z, e.k === 'bossdown' ? 0xffe080 : 0xff4a1a, 2.4, 1.2);
         break;
       case 'ult': {
         ultT = now; shake = Math.max(shake, 1.1); flashT = now;
@@ -917,7 +917,7 @@ export function createSiegeView(canvas, opts = {}) {
       case 'bless': { const s = vis.get(e.id); if (s) beam(s.x, s.y, s.z, s.x, 25, s.z, e.why === 'share' ? 0x7ad8ff : 0xfff0a0, 0.35, 0.8); if (e.why === 'share') barrierHit = now; break; }
       case 'class': { const s = vis.get(e.id); if (s) { ring(s.x, s.y + 0.1, s.z, CLS_COL[e.c] || 0xffffff, 1.2, 0.4); emit(glow, 8, s.x, s.y + 0.8, s.z, { color: CLS_COL[e.c] || 0xffffff, up: 1, speed: 2, g: -1, life: 0.5, size: 0.3 }); } break; }
       case 'join': { const s = vis.get(e.id); if (s) emit(glow, 6, s.x, s.y + 0.6, s.z, { color: 0xffffff, speed: 2, life: 0.4, size: 0.3 }); break; }
-      case 'wave': ring(0, 0.2, RIFT_Z + 3, 0xb040ff, 10, 1.0); break;
+      case 'wave': ring(0, 0.2, RIFT_Z + 3, 0xff4a1a, 10, 1.0); break;
       case 'chapter': shake = Math.max(shake, 0.6); ring(0, 0.2, RIFT_Z + 3, 0xff3a6a, 18, 1.4); break;
       case 'end': endState = { saved: !!e.saved, t0: now }; shake = Math.max(shake, 1.2); flashT = now; break;
       case 'intro': case 'gather': endState = null; bolts.length = 0; break;
