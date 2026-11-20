@@ -1,0 +1,471 @@
+{
+ "summary": {
+  "game": "cats",
+  "minutes": 10,
+  "maxFloor": 0,
+  "maxWave": 0,
+  "minSurvivors": null,
+  "crashed": 0,
+  "kind": "video",
+  "canvas": [
+   0,
+   0
+  ],
+  "peakWebProcessMB": 770.3,
+  "webProcessMBat1min": 732.2,
+  "webProcessMBend": 767.9,
+  "driftMB": 35.7,
+  "maxFighters": 0,
+  "maxCalls": 0,
+  "maxTris": 0,
+  "avgRafFps": 21.6,
+  "levels": [
+   1
+  ],
+  "contextLossTest": null,
+  "pageErrors": []
+ },
+ "samples": [
+  {
+   "tMin": 0,
+   "webProcessMB": 560.2,
+   "rafFps": 250,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 1,
+   "nodes": 49,
+   "snaps": 23,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 690,
+   "crashed": 0
+  },
+  {
+   "tMin": 0.5,
+   "webProcessMB": 663.2,
+   "rafFps": 29.6,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 890,
+   "nodes": 79,
+   "snaps": 325,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 1111,
+   "crashed": 0
+  },
+  {
+   "tMin": 1,
+   "webProcessMB": 732.2,
+   "rafFps": 22.1,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 1555,
+   "nodes": 89,
+   "snaps": 775,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 1810,
+   "crashed": 0
+  },
+  {
+   "tMin": 1.5,
+   "webProcessMB": 698,
+   "rafFps": 20.1,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 2159,
+   "nodes": 79,
+   "snaps": 1342,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 2744,
+   "crashed": 0
+  },
+  {
+   "tMin": 2,
+   "webProcessMB": 707.8,
+   "rafFps": 20.8,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 2785,
+   "nodes": 89,
+   "snaps": 1912,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 3817,
+   "crashed": 0
+  },
+  {
+   "tMin": 2.5,
+   "webProcessMB": 705.6,
+   "rafFps": 18.8,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 3349,
+   "nodes": 89,
+   "snaps": 2482,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 4959,
+   "crashed": 0
+  },
+  {
+   "tMin": 3,
+   "webProcessMB": 715.1,
+   "rafFps": 20.1,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 3953,
+   "nodes": 79,
+   "snaps": 3052,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 6115,
+   "crashed": 0
+  },
+  {
+   "tMin": 3.51,
+   "webProcessMB": 722.5,
+   "rafFps": 22.2,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 4619,
+   "nodes": 89,
+   "snaps": 3623,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 7215,
+   "crashed": 0
+  },
+  {
+   "tMin": 4.01,
+   "webProcessMB": 718.9,
+   "rafFps": 20.5,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 5234,
+   "nodes": 79,
+   "snaps": 4193,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 8334,
+   "crashed": 0
+  },
+  {
+   "tMin": 4.51,
+   "webProcessMB": 730.6,
+   "rafFps": 20.6,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 5853,
+   "nodes": 79,
+   "snaps": 4763,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 9299,
+   "crashed": 0
+  },
+  {
+   "tMin": 5.01,
+   "webProcessMB": 745.8,
+   "rafFps": 18.9,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 6421,
+   "nodes": 89,
+   "snaps": 5333,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 10379,
+   "crashed": 0
+  },
+  {
+   "tMin": 5.51,
+   "webProcessMB": 753,
+   "rafFps": 20,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 7021,
+   "nodes": 79,
+   "snaps": 5903,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 11536,
+   "crashed": 0
+  },
+  {
+   "tMin": 6.01,
+   "webProcessMB": 743.4,
+   "rafFps": 19.8,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 7615,
+   "nodes": 79,
+   "snaps": 6477,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 12432,
+   "crashed": 0
+  },
+  {
+   "tMin": 6.51,
+   "webProcessMB": 745.5,
+   "rafFps": 22.6,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 8294,
+   "nodes": 79,
+   "snaps": 7047,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 13474,
+   "crashed": 0
+  },
+  {
+   "tMin": 7.01,
+   "webProcessMB": 752.5,
+   "rafFps": 21.8,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 8949,
+   "nodes": 89,
+   "snaps": 7617,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 14469,
+   "crashed": 0
+  },
+  {
+   "tMin": 7.51,
+   "webProcessMB": 742.6,
+   "rafFps": 21.2,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 9587,
+   "nodes": 89,
+   "snaps": 8187,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 15566,
+   "crashed": 0
+  },
+  {
+   "tMin": 8.01,
+   "webProcessMB": 745.8,
+   "rafFps": 22.6,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 10266,
+   "nodes": 79,
+   "snaps": 8757,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 16602,
+   "crashed": 0
+  },
+  {
+   "tMin": 8.51,
+   "webProcessMB": 760.2,
+   "rafFps": 22.6,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 10945,
+   "nodes": 89,
+   "snaps": 9328,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 17698,
+   "crashed": 0
+  },
+  {
+   "tMin": 9.01,
+   "webProcessMB": 770.3,
+   "rafFps": 21.8,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 11600,
+   "nodes": 79,
+   "snaps": 9898,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 18641,
+   "crashed": 0
+  },
+  {
+   "tMin": 9.51,
+   "webProcessMB": 763.5,
+   "rafFps": 23.4,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 12304,
+   "nodes": 89,
+   "snaps": 10468,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 19755,
+   "crashed": 0
+  },
+  {
+   "tMin": 10.02,
+   "webProcessMB": 767.9,
+   "rafFps": 22.2,
+   "kind": "video",
+   "level": 1,
+   "fps": 30,
+   "phase": "dance",
+   "fighters": 0,
+   "raf": 12976,
+   "nodes": 89,
+   "snaps": 11042,
+   "ev": 0,
+   "errs": 0,
+   "canvas": [
+    0,
+    0
+   ],
+   "likes": 20637,
+   "crashed": 0
+  }
+ ]
+}
