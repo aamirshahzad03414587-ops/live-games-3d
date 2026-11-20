@@ -26,11 +26,14 @@ function wsUrl() {
   return u;
 }
 
+function kick(v) { if (v && v.src) v.play().catch(() => {}); }
 function makeVideo() {
   const v = document.createElement('video');
-  v.muted = true; v.defaultMuted = true; v.loop = true; v.playsInline = true;
+  v.muted = true; v.defaultMuted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
   v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', ''); v.setAttribute('muted', '');
-  v.preload = 'auto'; v.setAttribute('muted', 'true');
+  v.preload = 'auto'; v.setAttribute('muted', 'true'); v.setAttribute('autoplay', '');
+  v.addEventListener('canplay', () => kick(v));
+  v.addEventListener('loadeddata', () => kick(v));
   return v;
 }
 
@@ -58,6 +61,7 @@ function unlock() {
   if (unlocked) return;
   const act = () => {
     if (!MUTE) {
+      if (!song.src) song.src = (meta.song && meta.song.url) || '/cats/media/rannat-al-khalkhal.mp3';
       song.play().then(() => { unlocked = true; chip.hidden = true; }).catch(() => { chip.hidden = false; });
     } else { unlocked = true; chip.hidden = true; }
     try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { const c = new AC(); c.resume(); } } catch {}
