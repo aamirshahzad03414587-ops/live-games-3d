@@ -22,7 +22,7 @@ iframe{width:100%;aspect-ratio:9/16;border:0;border-radius:14px;background:#000}
 <main>
 <div>
   <section><h2>📱 Overlay for the iPhone</h2>
-    <div class="row"><span class="k">Game:</span><select id="gm" onchange="setGame()"><option value="br">⚔️ Battle Royale (/br)</option><option value="tower">🏰 Mira's Haunted Tower (/tower)</option><option value="siege">🌀 Dark Dimension Siege (/siege)</option></select></div>
+    <div class="row"><span class="k">Game:</span><select id="gm" onchange="setGame()"><option value="br">⚔️ Battle Royale (/br)</option><option value="tower">🏰 Mira's Haunted Tower (/tower)</option><option value="siege">🌀 Dark Dimension Siege (/siege)</option><option value="cats">🐱 Cat Dance Party (/cats)</option></select></div>
     <div class="k">Open this on the iPhone you stream from (Safari → Share → Add to Home Screen for full screen), tap once for sound, then go LIVE with screen share.</div>
     <p><code id="ovl"></code> <button class="alt" onclick="copy(ovl.textContent)">Copy</button></p>
     <div class="k">PC + LIVE Studio with TikFinity (forwards events, keep this link private):</div>
@@ -50,6 +50,18 @@ iframe{width:100%;aspect-ratio:9/16;border:0;border-radius:14px;background:#000}
     <div class="row"><label class="k">Gather s <input id="sgather" type="number" style="width:60px"></label><label class="k">Vote s <input id="svote" type="number" style="width:60px"></label><label class="k">Intro (0=off) <input id="sintro" type="number" style="width:50px"></label><label class="k">Bots fill to <input id="sminp" type="number" style="width:60px"></label><label class="k">Spawn × <input id="sspawn" type="number" step="0.1" style="width:55px"></label><label class="k">Enemy HP × <input id="shp" type="number" step="0.1" style="width:55px"></label><label class="k"><input id="sbots" type="checkbox"> bots</label><button onclick="saveSiege()">Save</button></div>
     <div class="row"><span class="k">Siege test chat:</span><button class="alt" onclick="sim('chat',{text:'mage'})">mage</button><button class="alt" onclick="sim('chat',{text:'warrior'})">warrior</button><button class="alt" onclick="sim('chat',{text:'archer'})">archer</button><button class="alt" onclick="sim('chat',{text:'healer'})">healer</button><button class="alt" onclick="sim('chat',{text:'1'})">1</button><button class="alt" onclick="sim('chat',{text:'2'})">2</button></div>
   </section>
+  <section><h2>🐱 Cat Dance Party</h2>
+    <pre id="cgame">…</pre>
+    <div class="row"><label class="k">Likes per dance <input id="clikes" type="number" style="width:70px"></label><label class="k">Group gift coins <input id="ccoins" type="number" style="width:70px"></label><label class="k"><input id="cvoice" type="checkbox"> short voice</label><button onclick="saveCats()">Save</button></div>
+    <div class="row"><span class="k">Choose a cat:</span>
+      <button class="alt" onclick="sim('gift',{giftName:'Rose',coins:1})">🌹 Rose · Maine Coon</button>
+      <button class="alt" onclick="sim('gift',{giftName:'TikTok',coins:1})">♪ TikTok · Bengal</button>
+      <button class="alt" onclick="sim('gift',{giftName:'Ice Cream Cone',coins:1})">🍦 Ice Cream · Persian</button>
+      <button class="alt" onclick="sim('gift',{giftName:'Finger Heart',coins:5})">💗 Finger Heart · Siamese</button>
+      <button class="gold" onclick="sim('gift',{giftName:'Doughnut',coins:30})">🍩 Doughnut · all 4</button>
+    </div>
+    <div class="row"><button class="alt" onclick="sim('like',{count:50})">Like ×50 (one dance)</button><button class="alt" onclick="sim('like',{count:30})">Like burst ×30</button></div>
+  </section>
   <section><h2>🧪 Test events</h2>
     <div class="row"><input id="nm" value="Tester" style="width:120px"><input id="txt" value="join" style="width:150px"><button onclick="sim('chat',{text:txt.value})">Comment</button><button class="alt" onclick="sim('like',{count:15})">Like ×15</button><button class="alt" onclick="sim('follow')">Follow</button><button class="alt" onclick="sim('share')">Share</button></div>
     <div class="row"><button class="alt" onclick="sim('gift',{giftName:'Rose',coins:1})">🌹 Rose 1</button><button class="alt" onclick="sim('gift',{giftName:'Finger Heart',coins:5})">☄️ 5</button><button class="alt" onclick="sim('gift',{giftName:'Doughnut',coins:30})">🦖 30</button><button class="alt" onclick="sim('gift',{giftName:'Hand Hearts',coins:100})">💖 100</button><button class="alt" onclick="sim('gift',{giftName:'Money Gun',coins:500})">☢️ 500</button></div>
@@ -70,6 +82,7 @@ const copy = (t) => navigator.clipboard && navigator.clipboard.writeText(t);
 function connectTT() { api('/settings', { tiktok: { username: $('user').value, liveSource: $('src').value } }).then(() => api('/tiktok/connect', { username: $('user').value })); }
 function save() { api('/settings', { br: { lobbySeconds: +$('lobby').value, arenaCap: +$('cap').value, minFighters: +$('minf').value, bots: $('bots').checked }, voice: { enabled: $('voice').checked } }); }
 function saveTower() { api('/settings', { tower: { gatherSeconds: +$('tgather').value, voteSeconds: +$('tvote').value, riddleSeconds: +$('trid').value, minParty: +$('tminp').value, bots: $('tbots').checked } }); }
+function saveCats() { api('/settings', { cats: { likesPerDance: +$('clikes').value, groupCoins: +$('ccoins').value, voice: $('cvoice').checked } }); }
 function saveSiege() { api('/settings', { siege: { gatherSeconds: +$('sgather').value, voteSeconds: +$('svote').value, introSeconds: +$('sintro').value, minDefenders: +$('sminp').value, spawnMul: +$('sspawn').value, enemyHpMul: +$('shp').value, bots: $('sbots').checked } }); }
 const base = location.origin;
 function setGame() {
@@ -87,11 +100,13 @@ async function poll() {
     $('game').textContent = JSON.stringify(s.br, null, 1);
     $('tgame').textContent = JSON.stringify(s.tower, null, 1);
     $('sgame').textContent = JSON.stringify(s.siege, null, 1);
+    if ($('cgame')) $('cgame').textContent = JSON.stringify(s.cats, null, 1);
     $('feed').textContent = (s.feed || []).map((f) => new Date(f.at).toLocaleTimeString() + ' ' + f.source + ' ' + f.type).reverse().join('\n');
     $('crowdSt').textContent = s.crowd ? `${s.crowd.mode}, ${s.crowd.left}s left` : '';
     if (first) { first = false; $('user').value = s.settings.tiktok.username || ''; $('src').value = s.settings.tiktok.liveSource || 'direct'; $('lobby').value = s.settings.br.lobbySeconds; $('cap').value = s.settings.br.arenaCap; $('minf').value = s.settings.br.minFighters; $('bots').checked = s.settings.br.bots; $('voice').checked = s.settings.voice.enabled;
       const T = s.settings.tower || {}; $('tgather').value = T.gatherSeconds; $('tvote').value = T.voteSeconds; $('trid').value = T.riddleSeconds; $('tminp').value = T.minParty; $('tbots').checked = T.bots !== false;
-      const S = s.settings.siege || {}; $('sgather').value = S.gatherSeconds; $('svote').value = S.voteSeconds; $('sintro').value = S.introSeconds; $('sminp').value = S.minDefenders; $('sspawn').value = S.spawnMul; $('shp').value = S.enemyHpMul; $('sbots').checked = S.bots !== false; }
+      const S = s.settings.siege || {}; $('sgather').value = S.gatherSeconds; $('svote').value = S.voteSeconds; $('sintro').value = S.introSeconds; $('sminp').value = S.minDefenders; $('sspawn').value = S.spawnMul; $('shp').value = S.enemyHpMul; $('sbots').checked = S.bots !== false;
+      const C = s.settings.cats || {}; if ($('clikes')) { $('clikes').value = C.likesPerDance; $('ccoins').value = C.groupCoins; $('cvoice').checked = !!C.voice; } }
   } catch (e) {}
   setTimeout(poll, 2000);
 }

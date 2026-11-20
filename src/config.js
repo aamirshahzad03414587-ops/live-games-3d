@@ -32,6 +32,11 @@ export function defaults() {
       introSeconds: num(env.SIEGE_INTRO, 0), spawnMul: num(env.SIEGE_SPAWN_MUL, 1), enemyHpMul: num(env.SIEGE_ENEMY_HP_MUL, 1), dmgMul: 1,
       voice: env.NARRATOR_VOICE || 'en-US-ChristopherNeural', rate: env.NARRATOR_RATE || '-6%', pitch: env.NARRATOR_PITCH || '-10Hz',
     },
+    cats: {
+      likesPerDance: num(env.CATS_LIKES_PER_DANCE, 50),
+      groupCoins: num(env.CATS_GROUP_COINS, 30),
+      voice: env.CATS_VOICE === '1',
+    },
   };
 }
 
@@ -39,7 +44,7 @@ export function loadConfig() {
   const c = defaults();
   try {
     const saved = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-    for (const k of ['tiktok', 'voice', 'br', 'tower', 'siege']) if (saved[k]) Object.assign(c[k], saved[k]);
+    for (const k of ['tiktok', 'voice', 'br', 'tower', 'siege', 'cats']) if (saved[k]) Object.assign(c[k], saved[k]);
     if (env.TIKTOK_USERNAME) c.tiktok.username = env.TIKTOK_USERNAME.replace(/^@/, '');   // the env wins on Render
   } catch {}
   return c;
@@ -48,7 +53,7 @@ export function loadConfig() {
 export function saveConfig(c) {
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-    const { tiktok, voice, br, tower, siege } = c;
-    fs.writeFileSync(FILE, JSON.stringify({ tiktok: { ...tiktok, signApiKey: undefined }, voice, br, tower, siege }, null, 1));
+    const { tiktok, voice, br, tower, siege, cats } = c;
+    fs.writeFileSync(FILE, JSON.stringify({ tiktok: { ...tiktok, signApiKey: undefined }, voice, br, tower, siege, cats }, null, 1));
   } catch (e) { console.log('[config] save failed:', e.message); }
 }

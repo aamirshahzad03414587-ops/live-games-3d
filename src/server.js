@@ -15,6 +15,7 @@ import { TowerGame } from './games/tower.js';
 import { TowerBoard } from './tower-board.js';
 import { SiegeGame } from './games/siege.js';
 import { SiegeBoard } from './siege-board.js';
+import { CatsGame } from './games/cats.js';
 import { crowd } from '../public/shared/crowd.js';
 
 const config = loadConfig();
@@ -27,6 +28,7 @@ const games = {
   br: new BRGame({ config, tts, board: new Board(path.join(DATA_DIR, 'br-board.json'), SECRET), broadcast: broadcastTo('br'), listeners: listeners('br') }),
   tower: new TowerGame({ config, tts, board: new TowerBoard(path.join(DATA_DIR, 'tower-board.json'), SECRET), broadcast: broadcastTo('tower'), listeners: listeners('tower') }),
   siege: new SiegeGame({ config, tts, board: new SiegeBoard(path.join(DATA_DIR, 'siege-board.json'), SECRET), broadcast: broadcastTo('siege'), listeners: listeners('siege') }),
+  cats: new CatsGame({ config, tts, broadcast: broadcastTo('cats'), listeners: listeners('cats') }),
 };
 for (const g of Object.values(games)) g.start();
 
@@ -64,8 +66,9 @@ app.get('/', page('index.html'));
 app.get(['/br', '/br/'], page('br/index.html'));
 app.get(['/tower', '/tower/'], page('tower/index.html'));
 app.get(['/siege', '/siege/'], page('siege/index.html'));
+app.get(['/cats', '/cats/'], page('cats/index.html'));
 app.get('/admin', requireKey, page('admin.html'));
-app.get(['/healthz', '/health'], (req, res) => res.json({ ok: true, tiktok: tiktok.status.state, overlays: clients.size, br: games.br.summary().phase, tower: games.tower.summary().phase, siege: games.siege.summary().phase, voice: tts.stats }));
+app.get(['/healthz', '/health'], (req, res) => res.json({ ok: true, tiktok: tiktok.status.state, overlays: clients.size, br: games.br.summary().phase, tower: games.tower.summary().phase, siege: games.siege.summary().phase, cats: games.cats.summary(), voice: tts.stats }));
 app.post('/diag', express.text({ type: '*/*', limit: '8kb' }), diagRoute());
 app.get('/tts/:id.mp3', (req, res) => {
   const buf = tts.get(req.params.id);
@@ -94,8 +97,8 @@ const admin = express.Router();
 admin.use(requireKey);
 let crowdRun = null;
 admin.get('/status', (req, res) => res.json({
-  tiktok: tiktok.status, br: games.br.summary(), tower: games.tower.summary(), siege: games.siege.summary(), overlays: [...clients].map((c) => ({ game: c.game, ios: c.ios, admin: c.admin, since: c.since })),
-  settings: { br: config.br, tower: config.tower, siege: config.siege, voice: { enabled: config.voice.enabled, voice: config.voice.voice, rate: config.voice.rate }, tiktok: { username: config.tiktok.username, liveSource: tiktok.source } },
+  tiktok: tiktok.status, br: games.br.summary(), tower: games.tower.summary(), siege: games.siege.summary(), cats: games.cats.summary(), overlays: [...clients].map((c) => ({ game: c.game, ios: c.ios, admin: c.admin, since: c.since })),
+  settings: { br: config.br, tower: config.tower, siege: config.siege, cats: config.cats, voice: { enabled: config.voice.enabled, voice: config.voice.voice, rate: config.voice.rate }, tiktok: { username: config.tiktok.username, liveSource: tiktok.source } },
   tts: { ...tts.stats, lastError: tts.lastError, check: tts.check || null }, crowd: crowdRun ? { mode: crowdRun.mode, left: Math.round((crowdRun.until - Date.now()) / 1000) } : null, feed: recentFeed.slice(-12), publicUrl: config.publicUrl,
 }));
 admin.post('/sim/:type', (req, res) => {
@@ -120,6 +123,7 @@ admin.post('/settings', (req, res) => {
   if (b.br) { for (const k of ['lobbySeconds', 'arenaCap', 'minFighters']) if (b.br[k] !== undefined) config.br[k] = Math.max(0, Math.min(k === 'arenaCap' ? 120 : 120, Number(b.br[k]) || 0)); if (b.br.bots !== undefined) config.br.bots = !!b.br.bots; games.br.applySettings(config.br); }
   if (b.tower) { for (const k of ['gatherSeconds', 'voteSeconds', 'minParty', 'riddleSeconds', 'bossSeconds']) if (b.tower[k] !== undefined) config.tower[k] = Math.max(0, Math.min(120, Number(b.tower[k]) || 0)); if (b.tower.bots !== undefined) config.tower.bots = !!b.tower.bots; games.tower.applySettings(config.tower); }
   if (b.siege) { for (const k of ['gatherSeconds', 'voteSeconds', 'minDefenders', 'introSeconds']) if (b.siege[k] !== undefined) config.siege[k] = Math.max(0, Math.min(120, Number(b.siege[k]) || 0)); for (const k of ['spawnMul', 'enemyHpMul', 'dmgMul']) if (b.siege[k] !== undefined) config.siege[k] = Math.max(0.3, Math.min(3, Number(b.siege[k]) || 1)); if (b.siege.bots !== undefined) config.siege.bots = !!b.siege.bots; games.siege.applySettings(config.siege); }
+  if (b.cats) { if (b.cats.likesPerDance !== undefined) config.cats.likesPerDance = Math.max(5, Math.min(500, Number(b.cats.likesPerDance) || 50)); if (b.cats.groupCoins !== undefined) config.cats.groupCoins = Math.max(10, Math.min(5000, Number(b.cats.groupCoins) || 30)); if (b.cats.voice !== undefined) config.cats.voice = !!b.cats.voice; games.cats.applySettings(config.cats); }
   if (b.voice) { if (b.voice.enabled !== undefined) config.voice.enabled = !!b.voice.enabled; if (typeof b.voice.voice === 'string' && /^[a-z]{2}-[A-Z]{2}-\w+Neural$/.test(b.voice.voice)) config.voice.voice = b.voice.voice; }
   if (b.tiktok) { if (typeof b.tiktok.username === 'string') config.tiktok.username = b.tiktok.username.replace(/^@/, '').trim().slice(0, 40); if (['direct', 'tikfinity', 'both'].includes(b.tiktok.liveSource)) config.tiktok.liveSource = b.tiktok.liveSource; configureTikTok(); }
   saveConfig(config);
@@ -153,7 +157,7 @@ wss.on('connection', (ws, req) => {
     let m; try { m = JSON.parse(raw); } catch { return; }
     if (m.t === 'tf' && c.admin && m.ev) tiktok.ingest(m.ev, 'tikfinity');
     else if (m.t === 'tf-status' && c.admin) tiktok.setStatus(m.state, m.message, { username: m.username });
-    else if (m.t === 'restore' && games[game].board.restore(m.json, m.sig)) { console.log(`[${game}] all-time board restored from the overlay copy`); games[game].broadcast(games[game].boardMsg()); }
+    else if (m.t === 'restore' && games[game].board && games[game].board.restore(m.json, m.sig)) { console.log(`[${game}] all-time board restored from the overlay copy`); games[game].broadcast(games[game].boardMsg()); }
   });
   ws.on('close', () => clients.delete(c));
 });
@@ -166,6 +170,7 @@ server.listen(PORT, () => {
   console.log(`  Battle Royale overlay (open on the iPhone): ${base}/br`);
   console.log(`  Haunted Tower overlay: ${base}/tower`);
   console.log(`  Dark Dimension Siege overlay: ${base}/siege`);
+  console.log(`  Cat Dance Party overlay: ${base}/cats`);
   console.log(`  Admin: ${base}/admin?key=…  (ADMIN_KEY ${config.adminKey ? 'set' : 'not set: admin only from this computer'})`);
   if (tiktok.usesDirect && tiktok.username) tiktok.connect().catch((e) => console.log('[tiktok]', e.message));
   if (process.env.TTS_SELFTEST !== '0') setTimeout(() => tts.selfTest().catch(() => {}), 3000).unref();

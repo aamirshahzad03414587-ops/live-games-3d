@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 const { webkit, devices } = require(process.env.PLAYWRIGHT || '/tmp/shot/node_modules/playwright-core');
 const BASE = process.env.BASE || 'http://localhost:3940', MINUTES = Number(process.env.MINUTES || 10), OUT = process.env.OUT || 'screenshots/soak-webkit.json';
 const LOSE_AT = Number(process.env.LOSE_AT || 3), KEY = process.env.ADMIN_KEY || '';
-const GAME = process.env.GAME || 'br', G = GAME === 'tower' ? '__towerUI' : GAME === 'siege' ? '__siegeUI' : '__br';
+const GAME = process.env.GAME || 'br', G = GAME === 'tower' ? '__towerUI' : GAME === 'siege' ? '__siegeUI' : GAME === 'cats' ? '__catsUI' : '__br';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const post = (p, body) => fetch(BASE + '/api/admin' + p, { method: 'POST', headers: { 'content-type': 'application/json', ...(KEY ? { 'x-admin-key': KEY } : {}) }, body: JSON.stringify(body || {}) }).then((r) => r.json()).catch((e) => ({ err: e.message }));
 // WebKitGTK on this Linux box has no media plugins: setting any <audio>.src crashes its web process (a test-machine
@@ -42,7 +42,7 @@ function pss() {
 }
 let lastRaf = 0, lastT = Date.now(), lostDone = false;
 async function sample(tMin) {
-  const p = await page.evaluate((g) => { const b = window[g]; const st = b.stats() || {}; return { kind: b.view.kind, level: b.level, fps: +b.fps.toFixed(1), phase: b.world.phase, floor: b.world.floor, wave: b.world.wv, survivors: b.world.sv, fighters: (b.world.fighters || b.world.members).length, rooms: st.rooms, calls: st.calls, tris: st.tris, tex: st.tex, geo: st.geo, chars: st.chars, parts: st.parts, raf: window.__raf || 0, nodes: document.getElementsByTagName('*').length, snaps: b.N.snaps, ev: b.N.ev, errs: b.N.err, canvas: [document.getElementById('gl').width, document.getElementById('gl').height] }; }, G);
+  const p = await page.evaluate((g) => { const b = window[g]; const st = b.stats() || {}; const gl = document.getElementById('gl'); return { kind: b.view.kind, level: b.level, fps: +(b.fps || 0).toFixed(1), phase: b.world && b.world.phase, floor: b.world && b.world.floor, wave: b.world && b.world.wv, survivors: b.world && b.world.sv, fighters: (b.world && (b.world.fighters || b.world.members) || []).length, rooms: st.rooms, calls: st.calls, tris: st.tris, tex: st.tex, geo: st.geo, chars: st.chars, parts: st.parts, raf: window.__raf || 0, nodes: document.getElementsByTagName('*').length, snaps: b.N && b.N.snaps, ev: b.N && b.N.ev, errs: b.N && b.N.err, canvas: gl ? [gl.width, gl.height] : [0, 0], likes: (b.snap && b.snap()) ? b.snap().likes : 0 }; }, G);
   const now = Date.now(), rafFps = +((p.raf - lastRaf) / ((now - lastT) / 1000)).toFixed(1); lastRaf = p.raf; lastT = now;
   return { tMin: +tMin.toFixed(2), webProcessMB: pss(), rafFps, ...p, crashed };
 }
@@ -53,7 +53,8 @@ while (Date.now() - t0 < MINUTES * 60e3) {
   if (el >= next) { const s = await sample(el).catch((e) => ({ tMin: +el.toFixed(2), error: e.message.slice(0, 120) })); samples.push(s); console.log(JSON.stringify(s)); next += 0.5; }
   if (!lostDone && el >= LOSE_AT) {
     lostDone = true;
-    ctxTest = await page.evaluate(async (g) => {
+    if (GAME === 'cats') { ctxTest = { skipped: 'no webgl on cats overlay' }; console.log('context loss test', JSON.stringify(ctxTest)); }
+    else ctxTest = await page.evaluate(async (g) => {
       const c = document.getElementById('gl'); const gl = c.getContext('webgl2') || c.getContext('webgl'); const ext = gl && gl.getExtension('WEBGL_lose_context');
       if (!ext) return { skipped: 'no WEBGL_lose_context' };
       ext.loseContext(); await new Promise((r) => setTimeout(r, 1200)); ext.restoreContext(); await new Promise((r) => setTimeout(r, 2500));

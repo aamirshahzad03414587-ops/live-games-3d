@@ -230,3 +230,18 @@ Free hosting note: Render's free plan has 750 instance hours a month **shared by
 takes ~50 s to wake. The open overlay pings the server every 4 min, so it stays awake during a LIVE. Open `/br` a minute
 before going LIVE. The all-time leaderboard lives in a small file that Render's free disk loses on restart; the overlay
 keeps a signed copy on the phone and gives it back after a restart.
+
+## Cat Dance Party (`/cats`)
+
+A 9:16 iPhone overlay: four photoreal cats dance to Aamir’s song **رنّة الخلخال** (Rannat al-Khalkhal, 114 BPM). Viewers pick a cat with a cheap TikTok gift. Likes cue a short random move. A Doughnut (or any gift of 30+ coins, or a combo of three different cat gifts) plays an all-four group dance. No duels — dance only.
+
+| Cat | Frame | Gift | Coins | Gift id |
+| --- | --- | --- | --- | --- |
+| Maine Coon (male) | gold Arabian arch | Rose | 1 | 5655 |
+| Bengal (male) | neon pink | TikTok | 1 | 5269 |
+| Persian (female) | emerald mosaic | Ice Cream Cone | 1 | 5827 |
+| Siamese (female) | purple velvet lantern | Finger Heart | 5 | 5487 |
+| All four | full-stage | Doughnut | 30 | 5879 |
+
+Gift icons on the overlay are our own stylized art, not TikTok’s copyrighted gift artwork. The likes-per-dance setting defaults to **50** (change it on the admin page). Open `/cats` on the iPhone, tap once so the song can play, then screen-share into the LIVE. Test only with the admin simulator or `npm run simulate` against localhost — never send fake events to the live server while TikTok may be connected.
+
